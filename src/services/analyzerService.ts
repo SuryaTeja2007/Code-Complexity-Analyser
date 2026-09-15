@@ -28,14 +28,15 @@ class AnalyzerService {
     return payload;
   }
 
-  async checkEngineStatus(): Promise<{ online: boolean; version?: string; geminiConfigured?: boolean }> {
+  async checkEngineStatus(): Promise<{ online: boolean; version?: string; aiConfigured?: boolean; aiModel?: unknown }> {
     try {
       const response = await fetch(`${this.apiBaseUrl}/health`);
       const payload = await response.json();
       return {
         online: response.ok && Boolean(payload.online),
         version: payload.version,
-        geminiConfigured: payload.geminiConfigured,
+        aiConfigured: payload.aiConfigured,
+        aiModel: payload.aiModel,
       };
     } catch {
       return { online: false };
