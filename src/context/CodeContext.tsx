@@ -35,7 +35,6 @@ export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [validationError, setValidationError] = useState<string | null>(null);
   const [infoNotification, setInfoNotification] = useState<string | null>(null);
 
-  // Clear notifications after 5 seconds if set
   useEffect(() => {
     if (validationError) {
       const timer = setTimeout(() => setValidationError(null), 5000);
@@ -52,7 +51,10 @@ export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setLanguage = (newLang: SupportedLanguage) => {
     setLanguageState(newLang);
+    setCode(SUPPORTED_LANGUAGES[newLang].defaultSample);
+    setActiveFilename(null);
     setValidationError(null);
+    setInfoNotification(`Loaded editable ${SUPPORTED_LANGUAGES[newLang].name} code sample.`);
   };
 
   const loadSampleCode = (targetLang?: SupportedLanguage) => {
