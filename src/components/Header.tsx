@@ -16,7 +16,6 @@ export const Header: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm transition-colors duration-150">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand Logo & Name */}
         <Link
           to="/"
           id="nav-brand-link"
@@ -26,11 +25,8 @@ export const Header: React.FC = () => {
             <Code2 className="w-5 h-5 text-emerald-400" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
+            <span className="font-semibold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
               Code Complexity Analyzer
-              <span className="hidden md:inline-flex text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                Phase 1
-              </span>
             </span>
             <span className="text-[11px] text-zinc-500 dark:text-zinc-400 hidden sm:block">
               AI-Powered Static & Complexity Analysis
@@ -38,7 +34,6 @@ export const Header: React.FC = () => {
           </div>
         </Link>
 
-        {/* Navigation links & Theme toggle */}
         <div className="flex items-center gap-1 sm:gap-4">
           <nav className="flex items-center gap-1" aria-label="Main Navigation">
             {navItems.map((item) => {
@@ -64,7 +59,6 @@ export const Header: React.FC = () => {
 
           <div className="h-5 w-px bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block" />
 
-          {/* Dark / Light Mode Toggle */}
           <button
             type="button"
             id="theme-toggle-btn"
