@@ -97,7 +97,11 @@ function analyzeStatically(code, language) {
     return new RegExp(`\\b${name}\\s*\\(`).test(body.replace(/^(?:.|\n)*?\{/, ''));
   }).length;
   const variableMatches = code.match(/\b(?:int|long|float|double|char|boolean|bool|string|String|auto|var|let|const)\s+[A-Za-z_]\w*/g) || [];
-  const collectionMatches = code.match(/\b(?:new\s+(?:ArrayList|HashMap|HashSet|Vector|LinkedList)|\[\s*\]|\b(?:list|dict|set)\s*\()/g) || [];
+
+  // Do not count primitive array declarations such as int[] or String[] as
+  // collection allocations. They are variables, not dynamic collection objects.
+  const collectionMatches = code.match(/\bnew\s+(?:ArrayList|HashMap|HashSet|Vector|LinkedList)\s*\(|\b(?:list|dict|set)\s*\(/g) || [];
+
   const maxNestingDepth = estimateNesting(code, language);
   const maxLoopNesting = estimateLoopNesting(code, language);
   const loopCount = loopMatches.length;
@@ -148,6 +152,7 @@ function analyzeStatically(code, language) {
     metrics: {
       loopCount,
       maxNestingDepth,
+      maxLoopNesting,
       branchCount,
       functionCount,
       recursiveFunctionCount,
@@ -166,19 +171,22 @@ function extractOptimizationFeatures(code, language, staticAnalysis) {
     || /for\s*\([^)]*\)[\s\S]{0,500}(?:==|===|equals\s*\()/.test(normalized);
   const sorting = /\b(sort|sorted|arrays\.sort|std::sort)\s*\(/.test(normalized);
   const binarySearch = /\b(binary.?search|lower_bound|upper_bound)\b/.test(normalized);
-  const repeatedComputation = /(?:Math\.|math\.|pow\s*\(|sqrt\s*\(|factorial|fibonacci)/.test(normalized) && staticAnalysis.loopCount > 0;
-  const largeAllocation = staticAnalysis.collectionAllocations >= 2 || /\b(?:malloc|calloc|realloc|new\s+\w+\s*\[|Array\s*\(|new\s+ArrayList|new\s+HashMap)\b/.test(normalized);
-  const unnecessaryTraversal = staticAnalysis.loopCount >= 2 || /\.forEach\s*\(|\.map\s*\(|\.filter\s*\(/.test(normalized);
-  const spacePressure = largeAllocation || staticAnalysis.collectionAllocations >= 2 || staticAnalysis.recursiveFunctionCount > 0;
-  const branchDepth = Math.min(1, staticAnalysis.maxNestingDepth / 4);
+  const repeatedComputation = /(?:Math\.|math\.|pow\s*\(|sqrt\s*\(|factorial|fibonacci)/.test(normalized)
+    && staticAnalysis.loopCount > 0;
+  const largeAllocation = staticAnalysis.metrics.collectionAllocations >= 2
+    || /\b(?:malloc|calloc|realloc|new\s+\w+\s*\[|new\s+ArrayList|new\s+HashMap)\b/.test(normalized);
+  const unnecessaryTraversal = staticAnalysis.loopCount >= 2
+    || /\.forEach\s*\(|\.map\s*\(|\.filter\s*\(/.test(normalized);
+  const spacePressure = largeAllocation || staticAnalysis.metrics.collectionAllocations >= 2 || staticAnalysis.metrics.recursiveFunctionCount > 0;
+  const branchDepth = Math.min(1, staticAnalysis.metrics.maxNestingDepth / 4);
   const linearScan = staticAnalysis.loopCount > 0 || repeatedSearch;
 
   return {
-    nestedLoops: staticAnalysis.metrics.loopCount >= 2 ? Math.min(1, staticAnalysis.maxNestingDepth / 2 || 1) : 0,
+    nestedLoops: staticAnalysis.metrics.maxLoopNesting >= 2 ? Math.min(1, staticAnalysis.metrics.maxLoopNesting / 2) : 0,
     repeatedSearch: repeatedSearch ? 1 : 0,
     sorting: sorting ? 1 : 0,
     binarySearch: binarySearch ? 1 : 0,
-    recursion: staticAnalysis.recursiveFunctionCount > 0 ? 1 : 0,
+    recursion: staticAnalysis.metrics.recursiveFunctionCount > 0 ? 1 : 0,
     largeAllocation: largeAllocation ? 1 : 0,
     repeatedComputation: repeatedComputation ? 1 : 0,
     unnecessaryTraversal: unnecessaryTraversal ? 1 : 0,
@@ -191,7 +199,14 @@ function extractOptimizationFeatures(code, language, staticAnalysis) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ success: true, online: true, version: '0.3.1-local-ai', analysisEngine: 'static-plus-local-ml', aiConfigured: true, aiModel: recommendationModelInfo });
+  res.json({
+    success: true,
+    online: true,
+    version: '0.3.2-local-ai',
+    analysisEngine: 'static-plus-local-ml',
+    aiConfigured: true,
+    aiModel: recommendationModelInfo
+  });
 });
 
 app.post('/api/analyze', async (req, res) => {
@@ -212,19 +227,27 @@ app.post('/api/analyze', async (req, res) => {
       model: recommendationModelInfo.name,
       modelType: recommendationModelInfo.type,
       trainingExamples: recommendationModelInfo.trainingExamples,
-      recommendation: 'UNAVAILABLE',
-      title: 'Recommendation unavailable',
+      recommendation: 'MODEL_ERROR',
+      title: 'Local AI model error',
       area: 'none',
-      explanation: error instanceof Error ? error.message : 'The local recommendation model failed to produce a result.',
-      guard: 'The deterministic static analysis remains available.',
+      explanation: error instanceof Error ? error.message : 'Unknown local recommendation model error.',
+      guard: 'Check the server logs and model implementation.',
       confidence: 'low',
       score: 0,
-      alternatives: [],
+      alternatives: []
     };
   }
-
   const lines = code.split(/\r?\n/);
-  return res.json({ success: true, message: 'Static analysis completed and local optimization AI recommendation added.', analysisReady: true, submittedAt: new Date().toISOString(), source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length }, staticAnalysis, aiRecommendation, options: options ?? {} });
+  return res.json({
+    success: true,
+    message: 'Static analysis completed and local optimization AI recommendation added.',
+    analysisReady: true,
+    submittedAt: new Date().toISOString(),
+    source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length },
+    staticAnalysis,
+    aiRecommendation,
+    options: options ?? {},
+  });
 });
 
 const isProduction = process.env.NODE_ENV === 'production';
