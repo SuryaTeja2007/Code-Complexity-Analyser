@@ -55,14 +55,19 @@ export interface StaticAnalysisResult {
   suggestions: string[];
 }
 
-export interface GeminiAnalysisResult {
+export interface AIRecommendationResult {
   available: boolean;
-  model?: string;
-  summary?: string;
-  suggestions?: string[];
-  explanation?: string;
-  confidence?: 'high' | 'medium' | 'low';
-  error?: string;
+  model: string;
+  modelType: string;
+  trainingExamples: number;
+  recommendation: string;
+  title: string;
+  area: string;
+  explanation: string;
+  guard: string;
+  confidence: 'high' | 'medium' | 'low';
+  score: number;
+  alternatives: Array<{ label: string; title: string; score: number }>;
 }
 
 export interface AnalyzeResponse {
@@ -72,6 +77,6 @@ export interface AnalyzeResponse {
   submittedAt?: string;
   source?: AnalysisSourceSummary;
   staticAnalysis?: StaticAnalysisResult;
-  gemini?: GeminiAnalysisResult;
+  aiRecommendation?: AIRecommendationResult;
   options?: AnalyzeRequest['options'];
 }
