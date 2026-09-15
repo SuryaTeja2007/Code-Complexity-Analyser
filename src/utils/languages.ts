@@ -53,12 +53,9 @@ int main(void) {
   },
 };
 
-export const ACCEPTED_EXTENSIONS = ['.java', '.c', '.cpp', '.py'];
+export const ACCEPTED_EXTENSIONS = ['.java', '.c', '.cpp', '.cc', '.cxx', '.py', '.txt', '.pdf'];
 
-/**
- * Detect language from filename or file extension.
- * Returns SupportedLanguage or null if unsupported.
- */
+/** Detect a programming language from a source-code filename. */
 export function detectLanguageFromFilename(filename: string): SupportedLanguage | null {
   if (!filename) return null;
   const lower = filename.toLowerCase();
@@ -69,4 +66,9 @@ export function detectLanguageFromFilename(filename: string): SupportedLanguage 
   if (lower.endsWith('.c') || lower.endsWith('.h')) return 'c';
 
   return null;
+}
+
+export function isGenericTextFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower.endsWith('.txt') || lower.endsWith('.pdf');
 }
