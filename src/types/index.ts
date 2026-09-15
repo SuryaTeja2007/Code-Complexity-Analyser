@@ -17,10 +17,6 @@ export interface AnalysisSubmissionState {
   status: 'idle' | 'pending_engine' | 'ready';
 }
 
-/**
- * Service Layer contracts for future Phase 2+ backend integration.
- * No mock data or fake calculations are performed in Phase 1.
- */
 export interface AnalyzeRequest {
   code: string;
   language: SupportedLanguage;
@@ -32,18 +28,19 @@ export interface AnalyzeRequest {
   };
 }
 
-export interface AnalysisMetricPlaceholder {
-  category: string;
-  status: 'pending_engine';
-  message: string;
+export interface AnalysisSourceSummary {
+  language: SupportedLanguage;
+  filename: string | null;
+  lines: number;
+  nonEmptyLines: number;
+  characters: number;
 }
 
 export interface AnalyzeResponse {
   success: boolean;
   message: string;
-  // Future fields for Phase 2:
-  // timeComplexity?: string;
-  // spaceComplexity?: string;
-  // explanations?: string[];
-  // metrics?: Record<string, unknown>;
+  analysisReady?: boolean;
+  submittedAt?: string;
+  source?: AnalysisSourceSummary;
+  options?: AnalyzeRequest['options'];
 }
