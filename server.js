@@ -38,6 +38,49 @@ function estimateNesting(code, language) {
   return maxDepth;
 }
 
+// Control-flow nesting and loop nesting are different. A Java class and main()
+// method add braces, but they must not turn two nested loops into O(n^3).
+function estimateLoopNesting(code, language) {
+  if (language === 'python') {
+    let maxDepth = 0;
+    const stack = [];
+    for (const line of code.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      const indent = (line.match(/^\s*/) || [''])[0].replace(/\t/g, '    ').length;
+      while (stack.length && indent <= stack[stack.length - 1]) stack.pop();
+      if (/^\s*(for|while)\b/.test(line)) {
+        stack.push(indent);
+        maxDepth = Math.max(maxDepth, stack.length);
+      }
+    }
+    return maxDepth;
+  }
+
+  const braceStack = [];
+  let loopDepth = 0;
+  let maxLoopDepth = 0;
+  for (const line of code.split(/\r?\n/)) {
+    const loopMatch = line.match(/\b(for|while|do)\b/);
+    const loopBodyStarts = Boolean(loopMatch && line.slice(loopMatch.index).includes('{'));
+    let loopBodyMarked = false;
+
+    for (const ch of line) {
+      if (ch === '{') {
+        const isLoopBody = loopBodyStarts && !loopBodyMarked;
+        braceStack.push(isLoopBody);
+        if (isLoopBody) {
+          loopBodyMarked = true;
+          loopDepth += 1;
+          maxLoopDepth = Math.max(maxLoopDepth, loopDepth);
+        }
+      } else if (ch === '}' && braceStack.length) {
+        if (braceStack.pop()) loopDepth = Math.max(0, loopDepth - 1);
+      }
+    }
+  }
+  return maxLoopDepth;
+}
+
 function analyzeStatically(code, language) {
   const lines = code.split(/\r?\n/);
   const loopMatches = [...code.matchAll(/\b(for|while|do)\b/g)];
@@ -56,6 +99,7 @@ function analyzeStatically(code, language) {
   const variableMatches = code.match(/\b(?:int|long|float|double|char|boolean|bool|string|String|auto|var|let|const)\s+[A-Za-z_]\w*/g) || [];
   const collectionMatches = code.match(/\b(?:new\s+(?:ArrayList|HashMap|HashSet|Vector|LinkedList)|\[\s*\]|\b(?:list|dict|set)\s*\()/g) || [];
   const maxNestingDepth = estimateNesting(code, language);
+  const maxLoopNesting = estimateLoopNesting(code, language);
   const loopCount = loopMatches.length;
   const branchCount = branchMatches.length;
   const functionCount = functions.length;
@@ -66,11 +110,14 @@ function analyzeStatically(code, language) {
   if (recursiveFunctionCount > 0) {
     timeComplexity = recursiveFunctionCount > 1 ? 'O(2^n) (approx.)' : 'O(n) to O(2^n) (depends on recursion branching)';
     confidence = 'low';
-  } else if (loopCount >= 3 || maxNestingDepth >= 3) {
-    timeComplexity = `O(n^${Math.min(3, Math.max(2, maxNestingDepth))}) (approx.)`;
+  } else if (maxLoopNesting >= 3) {
+    timeComplexity = `O(n^${Math.min(3, maxLoopNesting)}) (approx.)`;
     confidence = 'medium';
-  } else if (loopCount === 2) {
+  } else if (maxLoopNesting === 2) {
     timeComplexity = 'O(n²) (approx.)';
+    confidence = 'medium';
+  } else if (loopCount > 0) {
+    timeComplexity = 'O(n) (approx.)';
     confidence = 'medium';
   } else if (/\b(?:sort|sorted|Arrays\.sort)\s*\(/.test(code)) {
     timeComplexity = 'O(n log n) (operation-dependent)';
@@ -88,7 +135,7 @@ function analyzeStatically(code, language) {
   })) smells.push({ severity: 'medium', message: 'At least one function appears long; consider extracting cohesive helpers.' });
 
   const suggestions = [];
-  if (loopCount >= 2) suggestions.push('Review nested loops and determine whether the inner work can be reduced, indexed, or precomputed.');
+  if (maxLoopNesting >= 2) suggestions.push('Review nested loops and determine whether the inner work can be reduced, indexed, or precomputed.');
   if (collectionMatches.length > 0) suggestions.push('Choose collection types according to the dominant access pattern rather than using a single structure everywhere.');
   if (branchCount >= 6) suggestions.push('Consider simplifying complex conditional paths into smaller functions or clearer guard clauses.');
   if (suggestions.length === 0) suggestions.push('The current structure has no obvious structural optimization from this static pass.');
@@ -97,7 +144,7 @@ function analyzeStatically(code, language) {
     timeComplexity,
     spaceComplexity,
     confidence,
-    explanation: `Static inspection found ${loopCount} loop construct(s), ${branchCount} branch construct(s), ${functionCount} function(s), and an estimated maximum nesting depth of ${maxNestingDepth}. Complexity is an approximation because source-only analysis cannot know runtime input distributions or hidden library costs.`,
+    explanation: `Static inspection found ${loopCount} loop construct(s), ${branchCount} branch construct(s), ${functionCount} function(s), and an estimated maximum nesting depth of ${maxNestingDepth}. Loop nesting depth is estimated separately for complexity analysis: ${maxLoopNesting}. Complexity is an approximation because source-only analysis cannot know runtime input distributions or hidden library costs.`,
     metrics: {
       loopCount,
       maxNestingDepth,
@@ -119,18 +166,15 @@ function extractOptimizationFeatures(code, language, staticAnalysis) {
     || /for\s*\([^)]*\)[\s\S]{0,500}(?:==|===|equals\s*\()/.test(normalized);
   const sorting = /\b(sort|sorted|arrays\.sort|std::sort)\s*\(/.test(normalized);
   const binarySearch = /\b(binary.?search|lower_bound|upper_bound)\b/.test(normalized);
-  const repeatedComputation = /(?:Math\.|math\.|pow\s*\(|sqrt\s*\(|factorial|fibonacci)/.test(normalized)
-    && staticAnalysis.loopCount > 0;
-  const largeAllocation = staticAnalysis.collectionAllocations >= 2
-    || /\b(?:malloc|calloc|realloc|new\s+\w+\s*\[|Array\s*\(|new\s+ArrayList|new\s+HashMap)\b/.test(normalized);
-  const unnecessaryTraversal = staticAnalysis.loopCount >= 2
-    || /\.forEach\s*\(|\.map\s*\(|\.filter\s*\(/.test(normalized);
+  const repeatedComputation = /(?:Math\.|math\.|pow\s*\(|sqrt\s*\(|factorial|fibonacci)/.test(normalized) && staticAnalysis.loopCount > 0;
+  const largeAllocation = staticAnalysis.collectionAllocations >= 2 || /\b(?:malloc|calloc|realloc|new\s+\w+\s*\[|Array\s*\(|new\s+ArrayList|new\s+HashMap)\b/.test(normalized);
+  const unnecessaryTraversal = staticAnalysis.loopCount >= 2 || /\.forEach\s*\(|\.map\s*\(|\.filter\s*\(/.test(normalized);
   const spacePressure = largeAllocation || staticAnalysis.collectionAllocations >= 2 || staticAnalysis.recursiveFunctionCount > 0;
   const branchDepth = Math.min(1, staticAnalysis.maxNestingDepth / 4);
   const linearScan = staticAnalysis.loopCount > 0 || repeatedSearch;
 
   return {
-    nestedLoops: staticAnalysis.loopCount >= 2 ? Math.min(1, staticAnalysis.maxNestingDepth / 2 || 1) : 0,
+    nestedLoops: staticAnalysis.metrics.loopCount >= 2 ? Math.min(1, staticAnalysis.maxNestingDepth / 2 || 1) : 0,
     repeatedSearch: repeatedSearch ? 1 : 0,
     sorting: sorting ? 1 : 0,
     binarySearch: binarySearch ? 1 : 0,
@@ -147,14 +191,7 @@ function extractOptimizationFeatures(code, language, staticAnalysis) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({
-    success: true,
-    online: true,
-    version: '0.3.0-local-ai',
-    analysisEngine: 'static-plus-local-ml',
-    aiConfigured: true,
-    aiModel: recommendationModelInfo
-  });
+  res.json({ success: true, online: true, version: '0.3.1-local-ai', analysisEngine: 'static-plus-local-ml', aiConfigured: true, aiModel: recommendationModelInfo });
 });
 
 app.post('/api/analyze', async (req, res) => {
@@ -166,18 +203,28 @@ app.post('/api/analyze', async (req, res) => {
 
   const staticAnalysis = analyzeStatically(code, language);
   const features = extractOptimizationFeatures(code, language, staticAnalysis);
-  const aiRecommendation = recommendOptimizations(features);
+  let aiRecommendation;
+  try {
+    aiRecommendation = recommendOptimizations(features);
+  } catch (error) {
+    aiRecommendation = {
+      available: false,
+      model: recommendationModelInfo.name,
+      modelType: recommendationModelInfo.type,
+      trainingExamples: recommendationModelInfo.trainingExamples,
+      recommendation: 'UNAVAILABLE',
+      title: 'Recommendation unavailable',
+      area: 'none',
+      explanation: error instanceof Error ? error.message : 'The local recommendation model failed to produce a result.',
+      guard: 'The deterministic static analysis remains available.',
+      confidence: 'low',
+      score: 0,
+      alternatives: [],
+    };
+  }
+
   const lines = code.split(/\r?\n/);
-  return res.json({
-    success: true,
-    message: 'Static analysis completed and local optimization AI recommendation added.',
-    analysisReady: true,
-    submittedAt: new Date().toISOString(),
-    source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length },
-    staticAnalysis,
-    aiRecommendation,
-    options: options ?? {},
-  });
+  return res.json({ success: true, message: 'Static analysis completed and local optimization AI recommendation added.', analysisReady: true, submittedAt: new Date().toISOString(), source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length }, staticAnalysis, aiRecommendation, options: options ?? {} });
 });
 
 const isProduction = process.env.NODE_ENV === 'production';
