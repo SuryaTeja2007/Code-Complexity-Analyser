@@ -3,7 +3,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { recommendOptimizations, recommendationModelInfo } from './ml/recommendationModel.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +11,6 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const maxCodeLength = Number(process.env.MAX_CODE_LENGTH || 100000);
 const supportedLanguages = new Set(['java', 'c', 'cpp', 'python']);
-const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '1mb' }));
@@ -22,14 +21,11 @@ function lineNumber(code, index) {
 
 function estimateNesting(code, language) {
   if (language === 'python') {
-    let depth = 0;
     let maxDepth = 0;
     for (const line of code.split(/\r?\n/)) {
       if (!line.trim()) continue;
       const spaces = (line.match(/^\s*/) || [''])[0].replace(/\t/g, '    ').length;
-      const level = Math.floor(spaces / 4);
-      depth = level;
-      maxDepth = Math.max(maxDepth, depth);
+      maxDepth = Math.max(maxDepth, Math.floor(spaces / 4));
     }
     return maxDepth;
   }
@@ -76,9 +72,6 @@ function analyzeStatically(code, language) {
   } else if (loopCount === 2) {
     timeComplexity = 'O(n²) (approx.)';
     confidence = 'medium';
-  } else if (loopCount === 1) {
-    timeComplexity = 'O(n) (approx.)';
-    confidence = 'medium';
   } else if (/\b(?:sort|sorted|Arrays\.sort)\s*\(/.test(code)) {
     timeComplexity = 'O(n log n) (operation-dependent)';
     confidence = 'low';
@@ -98,7 +91,7 @@ function analyzeStatically(code, language) {
   if (loopCount >= 2) suggestions.push('Review nested loops and determine whether the inner work can be reduced, indexed, or precomputed.');
   if (collectionMatches.length > 0) suggestions.push('Choose collection types according to the dominant access pattern rather than using a single structure everywhere.');
   if (branchCount >= 6) suggestions.push('Consider simplifying complex conditional paths into smaller functions or clearer guard clauses.');
-  if (suggestions.length === 0) suggestions.push('The current structure has no obvious structural optimization from this lightweight static pass.');
+  if (suggestions.length === 0) suggestions.push('The current structure has no obvious structural optimization from this static pass.');
 
   return {
     timeComplexity,
@@ -120,32 +113,48 @@ function analyzeStatically(code, language) {
   };
 }
 
-async function askGemini(code, language, staticAnalysis) {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) return { available: false, error: 'Gemini API key is not configured.' };
+function extractOptimizationFeatures(code, language, staticAnalysis) {
+  const normalized = code.toLowerCase();
+  const repeatedSearch = /\b(indexof|find|search|contains|includes|findindex|linear search)\b/.test(normalized)
+    || /for\s*\([^)]*\)[\s\S]{0,500}(?:==|===|equals\s*\()/.test(normalized);
+  const sorting = /\b(sort|sorted|arrays\.sort|std::sort)\s*\(/.test(normalized);
+  const binarySearch = /\b(binary.?search|lower_bound|upper_bound)\b/.test(normalized);
+  const repeatedComputation = /(?:Math\.|math\.|pow\s*\(|sqrt\s*\(|factorial|fibonacci)/.test(normalized)
+    && staticAnalysis.loopCount > 0;
+  const largeAllocation = staticAnalysis.collectionAllocations >= 2
+    || /\b(?:malloc|calloc|realloc|new\s+\w+\s*\[|Array\s*\(|new\s+ArrayList|new\s+HashMap)\b/.test(normalized);
+  const unnecessaryTraversal = staticAnalysis.loopCount >= 2
+    || /\.forEach\s*\(|\.map\s*\(|\.filter\s*\(/.test(normalized);
+  const spacePressure = largeAllocation || staticAnalysis.collectionAllocations >= 2 || staticAnalysis.recursiveFunctionCount > 0;
+  const branchDepth = Math.min(1, staticAnalysis.maxNestingDepth / 4);
+  const linearScan = staticAnalysis.loopCount > 0 || repeatedSearch;
 
-  const ai = new GoogleGenAI({ apiKey });
-  const prompt = `You are a code-complexity reviewer. Analyze this ${language} source without executing it. Use the deterministic static findings below as evidence, but correct them when the source clearly contradicts them. Do not invent runtime facts. Return ONLY valid JSON with keys summary, explanation, suggestions (array), confidence (high|medium|low). Keep suggestions concrete and conditional.\n\nStatic findings:\n${JSON.stringify(staticAnalysis)}\n\nSource:\n${code}`;
-  try {
-    const response = await ai.models.generateContent({ model: geminiModel, contents: prompt, config: { responseMimeType: 'application/json' } });
-    const text = response.text || '{}';
-    const parsed = JSON.parse(text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim());
-    return {
-      available: true,
-      model: geminiModel,
-      summary: typeof parsed.summary === 'string' ? parsed.summary : undefined,
-      explanation: typeof parsed.explanation === 'string' ? parsed.explanation : undefined,
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((x) => typeof x === 'string').slice(0, 8) : [],
-      confidence: ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'medium',
-    };
-  } catch (error) {
-    console.error('Gemini analysis failed:', error instanceof Error ? error.message : error);
-    return { available: false, model: geminiModel, error: 'Gemini analysis was unavailable. Static analysis results are still shown.' };
-  }
+  return {
+    nestedLoops: staticAnalysis.loopCount >= 2 ? Math.min(1, staticAnalysis.maxNestingDepth / 2 || 1) : 0,
+    repeatedSearch: repeatedSearch ? 1 : 0,
+    sorting: sorting ? 1 : 0,
+    binarySearch: binarySearch ? 1 : 0,
+    recursion: staticAnalysis.recursiveFunctionCount > 0 ? 1 : 0,
+    largeAllocation: largeAllocation ? 1 : 0,
+    repeatedComputation: repeatedComputation ? 1 : 0,
+    unnecessaryTraversal: unnecessaryTraversal ? 1 : 0,
+    collectionUsage: Math.min(1, staticAnalysis.metrics.collectionAllocations / 2),
+    spacePressure: spacePressure ? 1 : 0,
+    branchDepth,
+    linearScan: linearScan ? 1 : 0,
+    language,
+  };
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ success: true, online: true, version: '0.2.0-analysis', analysisEngine: 'static-plus-gemini', geminiConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) });
+  res.json({
+    success: true,
+    online: true,
+    version: '0.3.0-local-ai',
+    analysisEngine: 'static-plus-local-ml',
+    aiConfigured: true,
+    aiModel: recommendationModelInfo
+  });
 });
 
 app.post('/api/analyze', async (req, res) => {
@@ -156,16 +165,17 @@ app.post('/api/analyze', async (req, res) => {
   if (filename !== undefined && filename !== null && typeof filename !== 'string') return res.status(400).json({ success: false, message: 'Filename must be a string when provided.' });
 
   const staticAnalysis = analyzeStatically(code, language);
-  const gemini = await askGemini(code, language, staticAnalysis);
+  const features = extractOptimizationFeatures(code, language, staticAnalysis);
+  const aiRecommendation = recommendOptimizations(features);
   const lines = code.split(/\r?\n/);
   return res.json({
     success: true,
-    message: gemini.available ? 'Static analysis completed and Gemini review added.' : 'Static analysis completed. Gemini review is unavailable for this request.',
+    message: 'Static analysis completed and local optimization AI recommendation added.',
     analysisReady: true,
     submittedAt: new Date().toISOString(),
     source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length },
     staticAnalysis,
-    gemini,
+    aiRecommendation,
     options: options ?? {},
   });
 });
