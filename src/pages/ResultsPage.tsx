@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, Brain, Clock, HardDrive, AlertTriangle, Zap, CheckSquare, Code2, Info, Target } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Brain, Clock, HardDrive, AlertTriangle, Zap, CheckSquare, Code2, Info, Target, Terminal } from 'lucide-react';
 import { useCodeContext } from '../hooks/useCodeContext';
 import { SUPPORTED_LANGUAGES } from '../utils/languages';
 import { AnalyzeResponse } from '../types';
@@ -13,6 +13,7 @@ export const ResultsPage: React.FC = () => {
   const analysis = (location.state as { analysis?: AnalyzeResponse } | null)?.analysis;
   const staticAnalysis = analysis?.staticAnalysis;
   const ai = analysis?.aiRecommendation;
+  const execution = analysis?.execution;
   const language = lastSubmittedLanguage ? SUPPORTED_LANGUAGES[lastSubmittedLanguage] : null;
 
   if (!analysis || !staticAnalysis) {
@@ -28,8 +29,20 @@ export const ResultsPage: React.FC = () => {
   return <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
       <div className="flex items-center gap-3"><Link to="/analyzer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium"><ArrowLeft className="w-3.5 h-3.5" />Back</Link><h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Analysis Results</h1></div>
-      <span className="text-xs font-mono px-2.5 py-1 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">Static + Local AI</span>
     </div>
+
+    <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+      <div className="flex items-center gap-2 mb-4"><Terminal className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Actual Program Output</h2></div>
+      {execution?.status === 'success' ? <>
+        <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4 overflow-auto max-h-80"><pre className="text-sm text-zinc-100 whitespace-pre-wrap break-words"><code>{execution.stdout || '(Program produced no standard output.)'}</code></pre></div>
+        <div className="mt-3 text-xs text-zinc-500">Executed successfully{execution.exitCode !== undefined && execution.exitCode !== null ? ` • exit code ${execution.exitCode}` : ''}</div>
+      </> : <>
+        <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-4 text-sm text-zinc-300">{execution?.message || 'Program output was not available.'}</div>
+        {execution?.stderr && <pre className="mt-3 rounded-lg bg-zinc-950 border border-red-900/40 p-4 text-xs text-red-300 whitespace-pre-wrap break-words overflow-auto max-h-60"><code>{execution.stderr}</code></pre>}
+        {execution?.status === 'compile_error' && <p className="mt-3 text-xs text-zinc-500">Fix the compilation errors and analyze again to see the program output.</p>}
+      </>}
+      {execution?.outputTruncated && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Output was truncated because it exceeded the display limit.</p>}
+    </section>
 
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4"><div className="flex items-center gap-3"><Code2 className="w-5 h-5 text-emerald-600" /><div><div className="text-xs text-zinc-500">Source</div><div className="font-semibold text-zinc-900 dark:text-zinc-100">{lastSubmittedFilename || `Untitled ${language?.name || ''}`}</div></div><span className="ml-auto text-xs font-mono text-zinc-500">{analysis.source?.lines} lines • {analysis.source?.characters} chars</span></div><button onClick={() => setShowSource(!showSource)} className="mt-3 inline-flex items-center gap-1 text-xs text-emerald-600">{showSource ? 'Hide Source' : 'View Source'}{showSource ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>{showSource && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-100"><code>{lastSubmittedCode}</code></pre>}</div>
 
