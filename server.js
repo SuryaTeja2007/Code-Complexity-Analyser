@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { recommendOptimizations, recommendationModelInfo } from './ml/recommendationModel.js';
+import { executeSourceCode, executionInfo } from './server/codeExecution.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,8 +39,6 @@ function estimateNesting(code, language) {
   return maxDepth;
 }
 
-// Control-flow nesting and loop nesting are different. A Java class and main()
-// method add braces, but they must not turn two nested loops into O(n^3).
 function estimateLoopNesting(code, language) {
   if (language === 'python') {
     let maxDepth = 0;
@@ -97,9 +96,6 @@ function analyzeStatically(code, language) {
     return new RegExp(`\\b${name}\\s*\\(`).test(body.replace(/^(?:.|\n)*?\{/, ''));
   }).length;
   const variableMatches = code.match(/\b(?:int|long|float|double|char|boolean|bool|string|String|auto|var|let|const)\s+[A-Za-z_]\w*/g) || [];
-
-  // Do not count primitive array declarations such as int[] or String[] as
-  // collection allocations. They are variables, not dynamic collection objects.
   const collectionMatches = code.match(/\bnew\s+(?:ArrayList|HashMap|HashSet|Vector|LinkedList)\s*\(|\b(?:list|dict|set)\s*\(/g) || [];
 
   const maxNestingDepth = estimateNesting(code, language);
@@ -202,10 +198,11 @@ app.get('/api/health', (_req, res) => {
   res.json({
     success: true,
     online: true,
-    version: '0.3.2-local-ai',
-    analysisEngine: 'static-plus-local-ml',
+    version: '0.4.0-local-ai-execution',
+    analysisEngine: 'static-plus-local-ml-plus-execution',
     aiConfigured: true,
-    aiModel: recommendationModelInfo
+    aiModel: recommendationModelInfo,
+    codeExecution: executionInfo,
   });
 });
 
@@ -237,15 +234,32 @@ app.post('/api/analyze', async (req, res) => {
       alternatives: []
     };
   }
+
+  let execution;
+  try {
+    execution = await executeSourceCode(code, language);
+  } catch (error) {
+    execution = {
+      available: false,
+      executed: false,
+      success: false,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Code execution failed unexpectedly.',
+      stdout: '',
+      stderr: '',
+    };
+  }
+
   const lines = code.split(/\r?\n/);
   return res.json({
     success: true,
-    message: 'Static analysis completed and local optimization AI recommendation added.',
+    message: 'Static analysis, local optimization AI recommendation, and program execution completed.',
     analysisReady: true,
     submittedAt: new Date().toISOString(),
     source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length },
     staticAnalysis,
     aiRecommendation,
+    execution,
     options: options ?? {},
   });
 });
