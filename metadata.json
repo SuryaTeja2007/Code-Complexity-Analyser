@@ -1,0 +1,6 @@
+{
+  "name": "AI-Powered Code Complexity Analyzer",
+  "description": "A web-based frontend foundation to analyze source code complexity, detect code smells, evaluate code quality, and provide optimization suggestions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
