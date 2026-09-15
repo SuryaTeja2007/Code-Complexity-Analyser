@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 const EXECUTION_TIMEOUT_MS = Number(process.env.CODE_EXECUTION_TIMEOUT_MS || 5000);
 const MAX_OUTPUT_LENGTH = Number(process.env.CODE_EXECUTION_MAX_OUTPUT || 12000);
 const ENABLE_CODE_EXECUTION = process.env.ENABLE_CODE_EXECUTION !== 'false';
+const JAVA_TARGET_VERSION = process.env.JAVA_TARGET_VERSION || '8';
 
 function truncate(value) {
   if (value.length <= MAX_OUTPUT_LENGTH) return { text: value, truncated: false };
@@ -92,7 +93,10 @@ async function executeInDirectory(language, dir, sourceFile) {
   }
 
   if (language === 'java') {
-    const compile = await runProcess('javac', [sourceFile], { cwd: dir, env });
+    // Compile to a class-file version compatible with the Java runtime used by
+    // the executor. This prevents javac/JVM mismatches such as class version
+    // 69 being run by a JVM that supports only up to class version 52.
+    const compile = await runProcess('javac', ['-source', JAVA_TARGET_VERSION, '-target', JAVA_TARGET_VERSION, sourceFile], { cwd: dir, env });
     if (!compile.ok) return { ...compile, stage: 'compile' };
     const className = path.basename(sourceFile, '.java');
     return { ...(await runProcess('java', ['-cp', dir, className], { cwd: dir, env })), stage: 'run' };
@@ -148,4 +152,5 @@ export const executionInfo = {
   enabled: ENABLE_CODE_EXECUTION,
   timeoutMs: EXECUTION_TIMEOUT_MS,
   maxOutputLength: MAX_OUTPUT_LENGTH,
+  javaTargetVersion: JAVA_TARGET_VERSION,
 };
