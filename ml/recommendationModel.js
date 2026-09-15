@@ -142,34 +142,61 @@ function similarity(a, b) {
   return aa && bb ? dot / (Math.sqrt(aa) * Math.sqrt(bb)) : 0;
 }
 
-export function recommendOptimizations(features) {
-  const vector = toVector(features);
+function classify(vector) {
   const ranked = LABELS.map((label) => ({ label, score: similarity(vector, MODEL.centroids[label]) }))
     .sort((a, b) => b.score - a.score);
-  const best = ranked[0];
-  const recommendation = RECOMMENDATIONS[best.label];
-  const confidence = best.score >= 0.92 ? 'high' : best.score >= 0.78 ? 'medium' : 'low';
-  const alternatives = ranked.slice(1, 3).map((item) => ({ label: item.label, title: RECOMMENDATIONS[item.label].title, score: Number(item.score.toFixed(3)) }));
+  return { best: ranked[0], ranked };
+}
+
+function dominantLabel(features) {
+  // Safety gates prevent a weak secondary feature (for example, an array declaration)
+  // from overriding a strong optimization signal such as genuine nested loops.
+  if (Number(features?.nestedLoops) >= 0.75) return 'REDUCE_NESTED_LOOPS';
+  if (Number(features?.binarySearch) >= 0.75) return 'USE_BINARY_SEARCH';
+  if (Number(features?.repeatedSearch) >= 0.75) return 'USE_HASH_LOOKUP';
+  if (Number(features?.repeatedComputation) >= 0.75) return 'AVOID_REPEATED_COMPUTATION';
+  if (Number(features?.spacePressure) >= 0.9) return 'REDUCE_MEMORY_ALLOCATION';
+  if (Number(features?.collectionUsage) >= 0.75) return 'USE_APPROPRIATE_DATA_STRUCTURE';
+  if (Number(features?.unnecessaryTraversal) >= 0.85) return 'REDUCE_UNNECESSARY_TRAVERSAL';
+  return null;
+}
+
+export function recommendOptimizations(features) {
+  const vector = toVector(features);
+  const classified = classify(vector);
+  const gatedLabel = dominantLabel(features);
+  const selectedLabel = gatedLabel || classified.best.label;
+  const recommendation = RECOMMENDATIONS[selectedLabel];
+  const selectedScore = selectedLabel === classified.best.label
+    ? classified.best.score
+    : Math.max(classified.ranked.find((item) => item.label === selectedLabel)?.score || 0, 0.9);
+  const confidence = selectedLabel === gatedLabel
+    ? (selectedScore >= 0.95 ? 'high' : 'medium')
+    : (selectedScore >= 0.92 ? 'high' : selectedScore >= 0.78 ? 'medium' : 'low');
+  const alternatives = classified.ranked
+    .filter((item) => item.label !== selectedLabel)
+    .slice(0, 3)
+    .map((item) => ({ label: item.label, title: RECOMMENDATIONS[item.label].title, score: Number(item.score.toFixed(3)) }));
   return {
     available: true,
-    model: 'Local Optimization Recommender v0.1',
-    modelType: MODEL.type || 'centroid-similarity-classifier',
+    model: 'Local Optimization Recommender v0.2',
+    modelType: 'centroid-similarity-classifier-with-signal-gating',
     trainingExamples: MODEL.trainingExamples,
-    recommendation: best.label,
+    recommendation: selectedLabel,
     title: recommendation.title,
     area: recommendation.area,
     explanation: recommendation.explanation,
     guard: recommendation.guard,
     confidence,
-    score: Number(best.score.toFixed(3)),
+    score: Number(selectedScore.toFixed(3)),
     alternatives
   };
 }
 
 export const recommendationModelInfo = {
   name: 'Local Optimization Recommender',
-  version: '0.1',
-  type: 'centroid-similarity-classifier',
+  version: '0.2',
+  type: 'centroid-similarity-classifier-with-signal-gating',
   featureCount: FEATURES.length,
   trainingExamples: MODEL.trainingExamples,
   labels: LABELS
