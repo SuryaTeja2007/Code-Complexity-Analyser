@@ -62,6 +62,15 @@ function safeEnvironment() {
   };
 }
 
+function javaClassName(code, filename) {
+  const fromFilename = filename && /^[A-Za-z_$][\w$]*\.java$/i.test(filename)
+    ? path.basename(filename, '.java')
+    : null;
+  const fromPublicClass = code.match(/\bpublic\s+(?:final\s+|abstract\s+)?class\s+([A-Za-z_$][\w$]*)/)?.[1];
+  const fromClass = code.match(/\bclass\s+([A-Za-z_$][\w$]*)/)?.[1];
+  return fromFilename || fromPublicClass || fromClass || 'Main';
+}
+
 async function executeInDirectory(language, dir, sourceFile) {
   const env = safeEnvironment();
   if (language === 'python') {
@@ -72,8 +81,7 @@ async function executeInDirectory(language, dir, sourceFile) {
     const binary = path.join(dir, process.platform === 'win32' ? 'program.exe' : 'program');
     const compile = await runProcess('gcc', [sourceFile, '-O0', '-o', binary], { cwd: dir, env });
     if (!compile.ok) return { ...compile, stage: 'compile' };
-    const runCommand = process.platform === 'win32' ? binary : binary;
-    return { ...(await runProcess(runCommand, [], { cwd: dir, env })), stage: 'run' };
+    return { ...(await runProcess(binary, [], { cwd: dir, env })), stage: 'run' };
   }
 
   if (language === 'cpp') {
@@ -93,14 +101,15 @@ async function executeInDirectory(language, dir, sourceFile) {
   return { ok: false, error: 'Unsupported execution language.', exitCode: null, signal: null, stage: 'setup' };
 }
 
-export async function executeSourceCode(code, language) {
+export async function executeSourceCode(code, language, filename = '') {
   if (!ENABLE_CODE_EXECUTION) {
     return { available: false, executed: false, success: false, status: 'disabled', message: 'Code execution is disabled by server configuration.' };
   }
 
   const id = crypto.randomUUID();
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), `code-analyzer-${id}-`));
-  const filenames = { python: 'main.py', c: 'main.c', cpp: 'main.cpp', java: 'Main.java' };
+  const javaName = javaClassName(code, filename);
+  const filenames = { python: 'main.py', c: 'main.c', cpp: 'main.cpp', java: `${javaName}.java` };
   const sourceFile = filenames[language];
 
   try {
