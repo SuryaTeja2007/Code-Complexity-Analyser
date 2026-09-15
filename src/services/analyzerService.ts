@@ -1,43 +1,45 @@
 import { AnalyzeRequest, AnalyzeResponse } from '../types';
 
-/**
- * Service Layer: AnalyzerService
- *
- * Prepared for Phase 2 integration when the backend analysis engine
- * (AST analysis, static analysis, Gemini API) is connected to POST /analyze.
- *
- * NOTE: For Phase 1, this service acts as the client contract boundary
- * without executing mock or simulated analysis.
- */
 class AnalyzerService {
   private apiBaseUrl: string;
 
   constructor() {
-    // Configurable endpoint prefix for future backend deployment
     this.apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
   }
 
-  /**
-   * Future Phase 2 backend analysis caller:
-   * Will dispatch to POST /api/analyze (or POST /analyze)
-   */
-  async submitForAnalysis(_request: AnalyzeRequest): Promise<AnalyzeResponse> {
-    // In Phase 1, the backend is not yet implemented.
-    // This signature guarantees architectural readiness without simulated calculations.
-    return {
-      success: true,
-      message: 'Analysis engine will be connected in Phase 2.',
-    };
+  async submitForAnalysis(request: AnalyzeRequest): Promise<AnalyzeResponse> {
+    const response = await fetch(`${this.apiBaseUrl}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+
+    let payload: AnalyzeResponse;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new Error('The analysis server returned an invalid response.');
+    }
+
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.message || 'The analysis request failed.');
+    }
+
+    return payload;
   }
 
-  /**
-   * Healthcheck or status verification for future backend connectivity
-   */
-  async checkEngineStatus(): Promise<{ online: boolean; version?: string }> {
-    return {
-      online: false,
-      version: 'Phase 1 Frontend Foundation',
-    };
+  async checkEngineStatus(): Promise<{ online: boolean; version?: string; geminiConfigured?: boolean }> {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/health`);
+      const payload = await response.json();
+      return {
+        online: response.ok && Boolean(payload.online),
+        version: payload.version,
+        geminiConfigured: payload.geminiConfigured,
+      };
+    } catch {
+      return { online: false };
+    }
   }
 }
 
