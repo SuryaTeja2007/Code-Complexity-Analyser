@@ -34,10 +34,13 @@ export const AnalyzerPage: React.FC = () => {
   };
 
   const handleFileLoaded = (content: string, fileLanguage: SupportedLanguage, filename: string) => {
-    setCode(content);
+    // setLanguage loads that language's default sample, so set it first and
+    // then replace the sample with the actual uploaded file contents.
     setLanguage(fileLanguage);
+    setCode(content);
     setActiveFilename(filename);
     setValidationError(null);
+
     const isGenericFile = /\.(txt|pdf)$/i.test(filename);
     setInfoNotification(
       isGenericFile
