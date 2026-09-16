@@ -208,12 +208,3 @@ export const executionInfo = {
   maxOutputLength: MAX_OUTPUT_LENGTH,
   javaTargetVersion: JAVA_TARGET_VERSION,
 };
-
-function javaClassName(code, filename) {
-  const fromFilename = filename && /^[A-Za-z_$][\w$]*\.java$/i.test(filename)
-    ? path.basename(filename, '.java')
-    : null;
-  const fromPublicClass = code.match(/\bpublic\s+(?:final\s+|abstract\s+)?class\s+([A-Za-z_$][\w$]*)/)?.[1];
-  const fromClass = code.match(/\bclass\s+([A-Za-z_$][\w$]*)/)?.[1];
-  return fromFilename || fromPublicClass || fromClass || 'Main';
-}
