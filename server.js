@@ -1,10 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { recommendOptimizations, recommendationModelInfo } from './ml/recommendationModel.js';
-import { executeSourceCode, executionInfo } from './server/codeExecution.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,7 +61,6 @@ function estimateLoopNesting(code, language) {
     const loopMatch = line.match(/\b(for|while|do)\b/);
     const loopBodyStarts = Boolean(loopMatch && line.slice(loopMatch.index).includes('{'));
     let loopBodyMarked = false;
-
     for (const ch of line) {
       if (ch === '{') {
         const isLoopBody = loopBodyStarts && !loopBodyMarked;
@@ -198,11 +196,10 @@ app.get('/api/health', (_req, res) => {
   res.json({
     success: true,
     online: true,
-    version: '0.4.0-local-ai-execution',
-    analysisEngine: 'static-plus-local-ml-plus-execution',
+    version: '0.4.1-local-ai',
+    analysisEngine: 'static-plus-local-ml',
     aiConfigured: true,
     aiModel: recommendationModelInfo,
-    codeExecution: executionInfo,
   });
 });
 
@@ -235,31 +232,15 @@ app.post('/api/analyze', async (req, res) => {
     };
   }
 
-  let execution;
-  try {
-    execution = await executeSourceCode(code, language, filename || '');
-  } catch (error) {
-    execution = {
-      available: false,
-      executed: false,
-      success: false,
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Code execution failed unexpectedly.',
-      stdout: '',
-      stderr: '',
-    };
-  }
-
   const lines = code.split(/\r?\n/);
   return res.json({
     success: true,
-    message: 'Static analysis, local optimization AI recommendation, and program execution completed.',
+    message: 'Static analysis and local optimization AI recommendation completed.',
     analysisReady: true,
     submittedAt: new Date().toISOString(),
     source: { language, filename: filename || null, lines: lines.length, nonEmptyLines: lines.filter((line) => line.trim()).length, characters: code.length },
     staticAnalysis,
     aiRecommendation,
-    execution,
     options: options ?? {},
   });
 });
