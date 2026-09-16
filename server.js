@@ -89,72 +89,61 @@ function analyzeStatically(code, language) {
     : [...code.matchAll(/\b(?:public|private|protected|static|inline|virtual|final|async|const)?\s*[A-Za-z_][\w:<>,\[\]]*\s+([A-Za-z_]\w*)\s*\([^;{}]*\)\s*\{/g)];
   const functions = functionMatches.map((m) => m[1]).filter(Boolean);
   const recursiveFunctionCount = functions.filter((name) => {
-    const bodyPattern = language === 'python'
-      ? new RegExp(`^\\s*def\\s+${name}\\b[\\s\\S]*?(?=^\\s*def\\s+|$)`, 'm')
-      : new RegExp(`(?:${name}\\s*\\([^)]*\\)[^{]*\\{)([\\s\\S]*?)(?=\\n\\s*\\}|$)`, 'm');
-    const body = code.match(bodyPattern)?.[0] || '';
-    return new RegExp(`\\b${name}\\s*\\(`).test(body.replace(/^(?:.|\n)*?\{/, ''));
+    const fn = language === 'python'
+      ? new RegExp(`^\\s*def\\s+${name}\\b[\\s\\S]*?(?=^\\s*def\\s+|$)`, 'm').exec(code)?.[0] || ''
+      : code;
+    return new RegExp(`\\b${name}\\s*\\(`).test(fn);
   }).length;
-  const variableMatches = code.match(/\b(?:int|long|float|double|char|boolean|bool|string|String|auto|var|let|const)\s+[A-Za-z_]\w*/g) || [];
-  const collectionMatches = code.match(/\bnew\s+(?:ArrayList|HashMap|HashSet|Vector|LinkedList)\s*\(|\b(?:list|dict|set)\s*\(/g) || [];
-
+  const loopCount = loopMatches.length;
   const maxNestingDepth = estimateNesting(code, language);
   const maxLoopNesting = estimateLoopNesting(code, language);
-  const loopCount = loopMatches.length;
   const branchCount = branchMatches.length;
-  const functionCount = functions.length;
-  const cyclomaticComplexity = 1 + branchCount + loopCount + recursiveFunctionCount;
+  const variableMatches = language === 'python'
+    ? [...code.matchAll(/\b(?:[A-Za-z_]\w*)\s*=/g)]
+    : [...code.matchAll(/\b(?:int|long|float|double|char|boolean|bool|string|String|auto|size_t)\s+[A-Za-z_]\w*/g)];
+  const variableCount = variableMatches.length;
+  const collectionMatches = code.match(/\b(?:vector|list|map|unordered_map|set|unordered_set|ArrayList|HashMap|HashSet|LinkedList|List|Dict|Set)\b|\[\s*\]|\b(?:malloc|calloc|realloc|new)\b/g) || [];
+  const collectionAllocations = collectionMatches.length;
+  const cyclomaticComplexity = 1 + branchCount + loopCount;
 
   let timeComplexity = 'O(1)';
-  let confidence = 'medium';
-  if (recursiveFunctionCount > 0) {
-    timeComplexity = recursiveFunctionCount > 1 ? 'O(2^n) (approx.)' : 'O(n) to O(2^n) (depends on recursion branching)';
-    confidence = 'low';
-  } else if (maxLoopNesting >= 3) {
-    timeComplexity = `O(n^${Math.min(3, maxLoopNesting)}) (approx.)`;
-    confidence = 'medium';
-  } else if (maxLoopNesting === 2) {
-    timeComplexity = 'O(n²) (approx.)';
-    confidence = 'medium';
-  } else if (loopCount > 0) {
-    timeComplexity = 'O(n) (approx.)';
-    confidence = 'medium';
-  } else if (/\b(?:sort|sorted|Arrays\.sort)\s*\(/.test(code)) {
-    timeComplexity = 'O(n log n) (operation-dependent)';
-    confidence = 'low';
-  }
+  if (maxLoopNesting >= 3) timeComplexity = 'O(n³)';
+  else if (maxLoopNesting === 2) timeComplexity = 'O(n²)';
+  else if (loopCount >= 2) timeComplexity = 'O(n²)';
+  else if (loopCount === 1) timeComplexity = 'O(n)';
+  if (/\b(?:sort|sorted|Arrays\.sort|std::sort)\s*\(/i.test(code) && loopCount <= 1) timeComplexity = 'O(n log n)';
+  if (/\b(?:binary.?search|lower_bound|upper_bound)\b/i.test(code) && loopCount === 0) timeComplexity = 'O(log n)';
+  if (recursiveFunctionCount > 0 && /\b(?:fibonacci|fib|subset|permutation|backtrack)\b/i.test(code)) timeComplexity = 'O(2^n)';
 
-  const spaceComplexity = recursiveFunctionCount > 0 || collectionMatches.length > 0 ? 'O(n) (approx.)' : 'O(1)';
+  let spaceComplexity = collectionAllocations > 0 ? 'O(n)' : 'O(1)';
+  if (recursiveFunctionCount > 0) spaceComplexity = 'O(n)';
+
+  const confidence = (maxLoopNesting >= 1 || loopCount > 0 || recursiveFunctionCount > 0) ? 'medium' : 'low';
   const smells = [];
-  if (maxNestingDepth >= 4) smells.push({ severity: 'high', message: 'Deep control-flow nesting may reduce readability and maintainability.' });
-  if (branchCount >= 8) smells.push({ severity: 'medium', message: 'High branch count increases decision complexity.' });
-  if (lines.length > 120) smells.push({ severity: 'medium', message: 'Large source file may benefit from decomposition into smaller modules.' });
-  if (functions.some((name) => {
-    const start = code.indexOf(name);
-    return lines.slice(lineNumber(code, start) - 1, lineNumber(code, start) + 50).length > 40;
-  })) smells.push({ severity: 'medium', message: 'At least one function appears long; consider extracting cohesive helpers.' });
-
+  if (maxNestingDepth >= 4) smells.push({ severity: 'high', message: 'Deep nesting makes this code harder to read and maintain.' });
+  if (cyclomaticComplexity >= 8) smells.push({ severity: 'medium', message: 'High cyclomatic complexity indicates many independent execution paths.' });
+  if (lines.length > 120) smells.push({ severity: 'low', message: 'Large source file; consider splitting responsibilities into smaller functions or modules.' });
   const suggestions = [];
-  if (maxLoopNesting >= 2) suggestions.push('Review nested loops and determine whether the inner work can be reduced, indexed, or precomputed.');
-  if (collectionMatches.length > 0) suggestions.push('Choose collection types according to the dominant access pattern rather than using a single structure everywhere.');
-  if (branchCount >= 6) suggestions.push('Consider simplifying complex conditional paths into smaller functions or clearer guard clauses.');
-  if (suggestions.length === 0) suggestions.push('The current structure has no obvious structural optimization from this static pass.');
+  if (maxLoopNesting >= 2) suggestions.push('Consider reducing nested traversal or using a more direct data structure.');
+  if (loopCount >= 2) suggestions.push('Check whether repeated passes can be combined safely.');
+  if (collectionAllocations >= 2) suggestions.push('Review collection allocations to avoid unnecessary memory usage.');
+  if (suggestions.length === 0) suggestions.push('No major structural optimization was detected from the static scan.');
 
   return {
     timeComplexity,
     spaceComplexity,
     confidence,
-    explanation: `Static inspection found ${loopCount} loop construct(s), ${branchCount} branch construct(s), ${functionCount} function(s), and an estimated maximum nesting depth of ${maxNestingDepth}. Loop nesting depth is estimated separately for complexity analysis: ${maxLoopNesting}. Complexity is an approximation because source-only analysis cannot know runtime input distributions or hidden library costs.`,
+    explanation: `Estimated from ${loopCount} loop(s), maximum loop nesting of ${maxLoopNesting}, ${branchCount} branch(es), and ${recursiveFunctionCount} recursive function(s).`,
     metrics: {
       loopCount,
       maxNestingDepth,
       maxLoopNesting,
       branchCount,
-      functionCount,
+      functionCount: functions.length,
       recursiveFunctionCount,
-      variableCount: variableMatches.length,
+      variableCount,
       cyclomaticComplexity,
-      collectionAllocations: collectionMatches.length,
+      collectionAllocations,
     },
     codeSmells: smells,
     suggestions,
@@ -237,7 +226,7 @@ app.post('/api/analyze', async (req, res) => {
 
   let execution;
   try {
-    execution = await executeSourceCode(code, language);
+    execution = await executeSourceCode(code, language, filename || '');
   } catch (error) {
     execution = {
       available: false,
