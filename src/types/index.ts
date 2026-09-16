@@ -71,19 +71,6 @@ export interface AIRecommendationResult {
   alternatives: Array<{ label: string; title: string; score: number }>;
 }
 
-export interface CodeExecutionResult {
-  available: boolean;
-  executed: boolean;
-  success: boolean;
-  status: 'success' | 'compile_error' | 'runtime_error' | 'timeout' | 'unavailable' | 'disabled' | 'error' | string;
-  message: string;
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number | null;
-  signal?: string | null;
-  outputTruncated?: boolean;
-}
-
 export interface AnalyzeResponse {
   success: boolean;
   message: string;
@@ -92,6 +79,5 @@ export interface AnalyzeResponse {
   source?: AnalysisSourceSummary;
   staticAnalysis?: StaticAnalysisResult;
   aiRecommendation?: AIRecommendationResult;
-  execution?: CodeExecutionResult;
   options?: AnalyzeRequest['options'];
 }
