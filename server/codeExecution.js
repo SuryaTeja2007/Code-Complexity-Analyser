@@ -87,9 +87,9 @@ async function findExecutable(candidates, options = {}) {
     const resolved = await commandExists(candidate);
     if (!resolved) continue;
 
-    // Windows' App Execution Aliases can expose python.exe/python3.exe from
-    // WindowsApps. Those are installers/aliases in some environments and can
-    // trigger a multi-second Python download instead of running Python.
+    // Windows App Execution Aliases can expose python.exe/python3.exe from
+    // WindowsApps. In some environments those are installer aliases and
+    // invoking them starts a Python download instead of executing code.
     if (options.rejectWindowsApps && process.platform === 'win32' && /[\\/]WindowsApps[\\/]/i.test(resolved)) {
       continue;
     }
@@ -98,7 +98,7 @@ async function findExecutable(candidates, options = {}) {
   return null;
 }
 
-async function detectToolchains() {
+export async function detectToolchains() {
   const [python, c, cpp, javac, java] = await Promise.all([
     findExecutable(process.platform === 'win32' ? ['python.exe', 'python3.exe'] : ['python3', 'python'], { rejectWindowsApps: true }),
     findExecutable(process.platform === 'win32' ? ['gcc.exe', 'clang.exe'] : ['gcc', 'clang']),
@@ -139,8 +139,7 @@ async function executeInDirectory(language, dir, sourceFile, toolchains) {
       return { ok: false, unavailable: true, error: 'Java compiler/runtime was not found. Install a JDK and restart the server.' };
     }
 
-    // Compile to Java 8 bytecode so the executor also works when its JVM is
-    // older than the JDK used to compile the application.
+    // Compile to Java 8 bytecode to avoid javac/JVM class-version mismatches.
     const compile = await runProcess(toolchains.javac.command, ['-source', JAVA_TARGET_VERSION, '-target', JAVA_TARGET_VERSION, sourceFile], { cwd: dir, env });
     if (!compile.ok) return { ...compile, stage: 'compile' };
     const className = path.basename(sourceFile, '.java');
@@ -156,9 +155,9 @@ export async function executeSourceCode(code, language, filename = '') {
   }
 
   const toolchains = await detectToolchains();
-  const selectedTool = toolchains[language === 'python' ? 'python' : language === 'c' ? 'c' : language === 'cpp' ? 'cpp' : 'java'];
+  const selectedTool = language === 'python' ? toolchains.python : language === 'c' ? toolchains.c : language === 'cpp' ? toolchains.cpp : null;
   if (language === 'java' && (!toolchains.javac || !toolchains.java)) {
-    return { available: false, executed: false, success: false, status: 'unavailable', message: 'Java compiler/runtime was not found. Install a JDK and restart the server.' };
+    return { available: false, executed: false, success: false, status: 'unavailable', message: 'Java compiler/runtime was not found. Install a JDK and restart the server.', stdout: '', stderr: '' };
   }
   if (language !== 'java' && !selectedTool) {
     const names = { python: 'Python', c: 'GCC/Clang', cpp: 'G++/Clang++' };
@@ -180,7 +179,7 @@ export async function executeSourceCode(code, language, filename = '') {
     if (result.timedOut) {
       return { available: true, executed: true, success: false, status: 'timeout', message: `Execution exceeded the ${EXECUTION_TIMEOUT_MS / 1000}-second limit.`, stdout: stdout.text, stderr: stderr.text, outputTruncated: stdout.truncated || stderr.truncated };
     }
-    if (result.unavailable || result.error && !result.stage) {
+    if (result.unavailable || (result.error && !result.stage)) {
       return { available: false, executed: false, success: false, status: 'unavailable', message: result.error || 'Required compiler/runtime is unavailable.', stdout: stdout.text, stderr: stderr.text, outputTruncated: stdout.truncated || stderr.truncated };
     }
     if (result.stage === 'compile' && !result.ok) {
@@ -209,3 +208,12 @@ export const executionInfo = {
   maxOutputLength: MAX_OUTPUT_LENGTH,
   javaTargetVersion: JAVA_TARGET_VERSION,
 };
+
+function javaClassName(code, filename) {
+  const fromFilename = filename && /^[A-Za-z_$][\w$]*\.java$/i.test(filename)
+    ? path.basename(filename, '.java')
+    : null;
+  const fromPublicClass = code.match(/\bpublic\s+(?:final\s+|abstract\s+)?class\s+([A-Za-z_$][\w$]*)/)?.[1];
+  const fromClass = code.match(/\bclass\s+([A-Za-z_$][\w$]*)/)?.[1];
+  return fromFilename || fromPublicClass || fromClass || 'Main';
+}
