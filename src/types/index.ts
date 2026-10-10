@@ -66,6 +66,12 @@ export interface AIRecommendationResult {
   area: string;
   explanation: string;
   guard: string;
+  issue?: string;
+  approach?: string;
+  expectedBenefit?: string;
+  tradeoffs?: string;
+  scoreMeaning?: string;
+  triggeredFeatures?: Array<{ feature: string; label: string; value: number; explanation: string }>;
   confidence: 'high' | 'medium' | 'low';
   score: number;
   alternatives: Array<{ label: string; title: string; score: number }>;
