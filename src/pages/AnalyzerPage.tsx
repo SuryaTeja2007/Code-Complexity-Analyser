@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Trash2, RotateCcw, FileText, Info, AlertCircle, Copy, Check, Minus, Plus, RotateCcw } from 'lucide-react';
+import { Play, Trash2, RotateCcw, FileText, Info, AlertCircle, Copy, Check, Minus, Plus } from 'lucide-react';
 import { useCodeContext } from '../hooks/useCodeContext';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { FileUpload } from '../components/FileUpload';
