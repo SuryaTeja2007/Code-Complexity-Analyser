@@ -46,7 +46,7 @@ export function findSyntaxIssues(code: string, language: SupportedLanguage): Syn
     }
 
     const trimmed = rawLine.trim();
-    if (language === 'java' && /^print\\s*\\(/.test(trimmed)) {
+    if (language === 'java' && /^print\s*\(/.test(trimmed)) {
       issues.push({ line: lineIndex + 1, column: Math.max(1, rawLine.indexOf('print') + 1), message: 'Java does not support print(...); use System.out.println(...) or System.out.print(...).' });
     }
 
