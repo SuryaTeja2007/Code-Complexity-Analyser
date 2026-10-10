@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { SupportedLanguage } from '../types';
 import { SUPPORTED_LANGUAGES } from '../utils/languages';
 
@@ -11,6 +11,7 @@ interface CodeContextType {
   lastSubmittedFilename: string | null;
   validationError: string | null;
   infoNotification: string | null;
+  hasRestoredDraft: boolean;
   setLanguage: (lang: SupportedLanguage) => void;
   setCode: (newCode: string) => void;
   setActiveFilename: (name: string | null) => void;
@@ -18,15 +19,39 @@ interface CodeContextType {
   setInfoNotification: (msg: string | null) => void;
   loadSampleCode: (lang?: SupportedLanguage) => void;
   clearCode: () => void;
+  discardSavedDraft: () => void;
   recordSubmission: () => boolean;
 }
 
 const CodeContext = createContext<CodeContextType | undefined>(undefined);
+const DRAFT_STORAGE_KEY = 'code-complexity-analyser-editor-draft';
+
+interface SavedEditorDraft {
+  code: string;
+  language: SupportedLanguage;
+  activeFilename: string | null;
+}
+
+const readSavedDraft = (): SavedEditorDraft | null => {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as Partial<SavedEditorDraft>;
+    const validLanguages: SupportedLanguage[] = ['java', 'c', 'cpp', 'python'];
+    if (typeof draft.code !== 'string' || !validLanguages.includes(draft.language as SupportedLanguage)) return null;
+    return { code: draft.code, language: draft.language as SupportedLanguage, activeFilename: typeof draft.activeFilename === 'string' ? draft.activeFilename : null };
+  } catch {
+    return null;
+  }
+};
 
 export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<SupportedLanguage>('python');
-  const [code, setCode] = useState<string>(() => SUPPORTED_LANGUAGES.python.defaultSample);
-  const [activeFilename, setActiveFilename] = useState<string | null>(null);
+  const [initialDraft] = useState<SavedEditorDraft | null>(readSavedDraft);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(Boolean(initialDraft));
+  const [language, setLanguageState] = useState<SupportedLanguage>(initialDraft?.language ?? 'python');
+  const [code, setCode] = useState<string>(initialDraft?.code ?? SUPPORTED_LANGUAGES.python.defaultSample);
+  const [activeFilename, setActiveFilename] = useState<string | null>(initialDraft?.activeFilename ?? null);
+  const skipInitialSave = useRef(!initialDraft);
 
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
   const [lastSubmittedLanguage, setLastSubmittedLanguage] = useState<SupportedLanguage | null>(null);
@@ -34,6 +59,22 @@ export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [validationError, setValidationError] = useState<string | null>(null);
   const [infoNotification, setInfoNotification] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (skipInitialSave.current) {
+      skipInitialSave.current = false;
+      return;
+    }
+    if (!code.trim()) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return;
+    }
+    try {
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ code, language, activeFilename }));
+    } catch {
+      // Storage may be unavailable or full; editing should continue normally.
+    }
+  }, [code, language, activeFilename]);
 
   useEffect(() => {
     if (validationError) {
@@ -68,9 +109,19 @@ export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCode = () => {
     setCode('');
+    setHasRestoredDraft(false);
     setActiveFilename(null);
     setValidationError(null);
     setInfoNotification('Editor content cleared.');
+  };
+
+  const discardSavedDraft = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setCode('');
+    setActiveFilename(null);
+    setHasRestoredDraft(false);
+    setValidationError(null);
+    setInfoNotification('Saved draft discarded.');
   };
 
   const recordSubmission = (): boolean => {
@@ -97,6 +148,7 @@ export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastSubmittedFilename,
         validationError,
         infoNotification,
+        hasRestoredDraft,
         setLanguage,
         setCode,
         setActiveFilename,
@@ -104,6 +156,7 @@ export const CodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setInfoNotification,
         loadSampleCode,
         clearCode,
+        discardSavedDraft,
         recordSubmission,
       }}
     >
