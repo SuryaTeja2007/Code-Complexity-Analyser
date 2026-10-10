@@ -45,8 +45,12 @@ export function findSyntaxIssues(code: string, language: SupportedLanguage): Syn
       }
     }
 
+    const trimmed = rawLine.trim();
+    if (language === 'java' && /^print\\s*\\(/.test(trimmed)) {
+      issues.push({ line: lineIndex + 1, column: Math.max(1, rawLine.indexOf('print') + 1), message: 'Java does not support print(...); use System.out.println(...) or System.out.print(...).' });
+    }
+
     if (language === 'python') {
-      const trimmed = rawLine.trim();
       if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\b/.test(trimmed) && !trimmed.endsWith(':') && !trimmed.endsWith(String.fromCharCode(92))) {
         issues.push({ line: lineIndex + 1, column: Math.max(1, rawLine.length), message: 'Expected a colon (:) at the end of this statement.' });
       }
