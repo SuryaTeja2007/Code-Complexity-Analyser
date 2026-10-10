@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 
 type SyntaxIssue = { line: number; column: number; message: string };
 
-function findSyntaxIssues(code: string, language: SupportedLanguage): SyntaxIssue[] {
+export function findSyntaxIssues(code: string, language: SupportedLanguage): SyntaxIssue[] {
   const issues: SyntaxIssue[] = [];
   const lines = code.split(/\r?\n/);
   const stack: Array<{ char: string; line: number; column: number }> = [];
