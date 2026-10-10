@@ -4,7 +4,7 @@ import { Play, Trash2, RotateCcw, FileText, Info, AlertCircle, Copy, Check, Minu
 import { useCodeContext } from '../hooks/useCodeContext';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { FileUpload } from '../components/FileUpload';
-import { CodeEditor } from '../components/CodeEditor';
+import { CodeEditor, findSyntaxIssues } from '../components/CodeEditor';
 import { SupportedLanguage } from '../types';
 import { SUPPORTED_LANGUAGES } from '../utils/languages';
 import { analyzerService } from '../services/analyzerService';
@@ -421,6 +421,12 @@ export const AnalyzerPage: React.FC = () => {
   const handleAnalyzeClick = async () => {
     if (!code || code.trim().length === 0) {
       setValidationError('Code editor is empty. Please enter code or upload a source file before analyzing.');
+      return;
+    }
+    const syntaxIssues = findSyntaxIssues(code, language);
+    if (syntaxIssues.length > 0) {
+      const firstIssue = syntaxIssues[0];
+      setValidationError(`Syntax error on line ${firstIssue.line}: ${firstIssue.message} Fix the reported syntax issue(s) before analyzing.`);
       return;
     }
     if (!recordSubmission()) return;
