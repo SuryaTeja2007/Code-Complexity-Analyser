@@ -1,5 +1,6 @@
 import React from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import { KeyCode, KeyMod } from 'monaco-editor';
 import { useTheme } from '../hooks/useTheme';
 import { SupportedLanguage } from '../types';
 import { SUPPORTED_LANGUAGES } from '../utils/languages';
@@ -9,6 +10,7 @@ interface CodeEditorProps {
   code: string;
   language: SupportedLanguage;
   onChange: (value: string | undefined) => void;
+  onAnalyze?: () => void;
   height?: string;
 }
 
@@ -16,6 +18,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   code,
   language,
   onChange,
+  onAnalyze,
   height = '500px',
 }) => {
   const { theme } = useTheme();
@@ -24,6 +27,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   const handleEditorDidMount: OnMount = (editor) => {
     // Focus editor on initial mount if desired
+    if (onAnalyze) {
+      editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, onAnalyze);
+    }
     editor.updateOptions({
       tabSize: language === 'python' ? 4 : 4,
       insertSpaces: true,
