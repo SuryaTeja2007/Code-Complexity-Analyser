@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { KeyCode, KeyMod } from 'monaco-editor';
 import { useTheme } from '../hooks/useTheme';
@@ -26,10 +26,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   height = '500px',
 }) => {
   const { theme } = useTheme();
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const langConfig = SUPPORTED_LANGUAGES[language];
   const monacoTheme = theme === 'dark' ? 'vs-dark' : 'light';
 
   const handleEditorDidMount: OnMount = (editor) => {
+    editorRef.current = editor;
     // Focus editor on initial mount if desired
     if (onAnalyze) {
       editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, onAnalyze);
@@ -39,6 +41,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       insertSpaces: true,
     });
   };
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({ fontSize, tabSize, insertSpaces: true });
+  }, [fontSize, tabSize]);
 
   return (
     <div
