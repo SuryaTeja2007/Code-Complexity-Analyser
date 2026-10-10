@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, Brain, Clock, HardDrive, AlertTriangle, Zap, CheckSquare, Code2, Info, Target, ListChecks } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Brain, AlertTriangle, Zap, Code2, Info, Target, ListChecks } from 'lucide-react';
 import { useCodeContext } from '../hooks/useCodeContext';
 import { SUPPORTED_LANGUAGES } from '../utils/languages';
 import { AnalyzeResponse } from '../types';
@@ -31,11 +31,7 @@ export const ResultsPage: React.FC = () => {
     { label: 'Optimization recommendations', value: recommendationCount },
   ];
 
-  const cards = [
-    { title: 'Time Complexity', value: staticAnalysis.timeComplexity, icon: Clock },
-    { title: 'Space Complexity', value: staticAnalysis.spaceComplexity, icon: HardDrive },
-    { title: 'Quality Signals', value: `${Math.max(0, 100 - staticAnalysis.codeSmells.length * 10)}/100`, icon: CheckSquare },
-  ];
+
 
   return <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
@@ -43,8 +39,6 @@ export const ResultsPage: React.FC = () => {
     </div>
 
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4"><div className="flex items-center gap-3"><Code2 className="w-5 h-5 text-emerald-600" /><div><div className="text-xs text-zinc-500">Source</div><div className="font-semibold text-zinc-900 dark:text-zinc-100">{lastSubmittedFilename || `Untitled ${language?.name || ''}`}</div></div><span className="ml-auto text-xs font-mono text-zinc-500">{analysis.source?.lines} lines • {analysis.source?.characters} chars</span></div><button onClick={() => setShowSource(!showSource)} className="mt-3 inline-flex items-center gap-1 text-xs text-emerald-600">{showSource ? 'Hide Source' : 'View Source'}{showSource ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>{showSource && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-100"><code>{lastSubmittedCode}</code></pre>}</div>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{cards.map(({ title, value, icon: Icon }) => <div key={title} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"><Icon className="w-5 h-5 text-emerald-600 mb-4" /><div className="text-xs text-zinc-500">{title}</div><div className="mt-1 text-lg font-bold text-zinc-900 dark:text-zinc-100 break-words">{value}</div></div>)}</div>
 
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4"><ListChecks className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Analysis Summary</h2></div>
@@ -60,9 +54,32 @@ export const ResultsPage: React.FC = () => {
     </div>
 
     <button onClick={() => setShowDetails(!showDetails)} className="self-start inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm">{showDetails ? 'Hide' : 'Show'} detailed findings{showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
-    {showDetails && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6"><h2 className="font-semibold mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-500" />Code Smells</h2>{staticAnalysis.codeSmells.length ? <ul className="space-y-3">{staticAnalysis.codeSmells.map((smell, i) => <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400"><span className="font-medium uppercase text-[10px] mr-2">{smell.severity}</span>{smell.message}</li>)}</ul> : <p className="text-sm text-zinc-500">No structural smells detected.</p>}</section>
-      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6"><h2 className="font-semibold mb-4 flex items-center gap-2"><Zap className="w-4 h-4 text-emerald-600" />Optimization Suggestions</h2><ul className="space-y-3">{staticAnalysis.suggestions.map((suggestion, i) => <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 list-disc ml-4">{suggestion}</li>)}{ai?.available && <li className="text-sm text-zinc-700 dark:text-zinc-300 list-disc ml-4 font-medium">AI: {ai.title} — {ai.explanation}</li>}</ul></section>
+    {showDetails && <div className="flex flex-col gap-6">
+      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+        <h2 className="font-semibold mb-2 flex items-center gap-2"><ListChecks className="w-4 h-4 text-emerald-600" />Static Analysis Details</h2>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">{staticAnalysis.explanation}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Loop count', value: staticAnalysis.metrics.loopCount },
+            { label: 'Maximum nesting depth', value: staticAnalysis.metrics.maxNestingDepth },
+            { label: 'Maximum loop nesting', value: staticAnalysis.metrics.maxLoopNesting ?? 'Not measured' },
+            { label: 'Branch count', value: staticAnalysis.metrics.branchCount },
+            { label: 'Functions detected', value: staticAnalysis.metrics.functionCount },
+            { label: 'Recursive functions', value: staticAnalysis.metrics.recursiveFunctionCount },
+            { label: 'Variables detected', value: staticAnalysis.metrics.variableCount },
+            { label: 'Cyclomatic complexity', value: staticAnalysis.metrics.cyclomaticComplexity },
+            { label: 'Collection allocations', value: staticAnalysis.metrics.collectionAllocations },
+            { label: 'Estimator confidence', value: staticAnalysis.confidence },
+          ].map((metric) => <div key={metric.label} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/50 p-3">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">{metric.label}</div>
+            <div className="mt-1 text-base font-semibold text-zinc-900 dark:text-zinc-100 break-words">{metric.value}</div>
+          </div>)}
+        </div>
+      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6"><h2 className="font-semibold mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-500" />Code Smells</h2>{staticAnalysis.codeSmells.length ? <ul className="space-y-3">{staticAnalysis.codeSmells.map((smell, i) => <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400"><span className="font-medium uppercase text-[10px] mr-2">{smell.severity}</span>{smell.message}</li>)}</ul> : <p className="text-sm text-zinc-500">No structural smells detected.</p>}</section>
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6"><h2 className="font-semibold mb-4 flex items-center gap-2"><Zap className="w-4 h-4 text-emerald-600" />Optimization Suggestions</h2>{staticAnalysis.suggestions.length || ai?.available ? <ul className="space-y-3">{staticAnalysis.suggestions.map((suggestion, i) => <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 list-disc ml-4">{suggestion}</li>)}{ai?.available && <li className="text-sm text-zinc-700 dark:text-zinc-300 list-disc ml-4 font-medium">AI: {ai.title} — {ai.explanation}</li>}</ul> : <p className="text-sm text-zinc-500">No optimization suggestions were generated.</p>}</section>
+      </div>
     </div>}
   </div>;
 };
