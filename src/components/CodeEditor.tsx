@@ -11,6 +11,8 @@ interface CodeEditorProps {
   language: SupportedLanguage;
   onChange: (value: string | undefined) => void;
   onAnalyze?: () => void;
+  fontSize?: number;
+  tabSize?: number;
   height?: string;
 }
 
@@ -19,6 +21,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   language,
   onChange,
   onAnalyze,
+  fontSize = 13.5,
+  tabSize = 4,
   height = '500px',
 }) => {
   const { theme } = useTheme();
@@ -31,7 +35,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, onAnalyze);
     }
     editor.updateOptions({
-      tabSize: language === 'python' ? 4 : 4,
+      tabSize,
       insertSpaces: true,
     });
   };
@@ -56,7 +60,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         }
         options={{
           minimap: { enabled: false },
-          fontSize: 13.5,
+          fontSize,
+          tabSize,
+          insertSpaces: true,
           fontFamily:
             "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
           lineNumbers: 'on',
