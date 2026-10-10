@@ -47,7 +47,7 @@ function findSyntaxIssues(code: string, language: SupportedLanguage): SyntaxIssu
 
     if (language === 'python') {
       const trimmed = rawLine.trim();
-      if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\\b/.test(trimmed) && !trimmed.endsWith(':') && !trimmed.endsWith(String.fromCharCode(92))) {
+      if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\b/.test(trimmed) && !trimmed.endsWith(':') && !trimmed.endsWith(String.fromCharCode(92))) {
         issues.push({ line: lineIndex + 1, column: Math.max(1, rawLine.length), message: 'Expected a colon (:) at the end of this statement.' });
       }
     }
