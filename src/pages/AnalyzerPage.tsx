@@ -378,7 +378,8 @@ int main() {
 export const AnalyzerPage: React.FC = () => {
   const navigate = useNavigate();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [codeCopied, setCodeCopied] = useState(false);\n  const [examplesOpen, setExamplesOpen] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [editorFontSize, setEditorFontSize] = useState(() => Number(localStorage.getItem('cca-editor-font-size')) || 13.5);
   const { language, code, activeFilename, setLanguage, setCode, setActiveFilename, setValidationError, setInfoNotification, clearCode, discardSavedDraft, hasRestoredDraft, recordSubmission } = useCodeContext();
   const lineCount = useMemo(() => (code ? code.split('\n').length : 0), [code]);
