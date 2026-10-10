@@ -10,6 +10,7 @@ export const ResultsPage: React.FC = () => {
   const { lastSubmittedCode, lastSubmittedLanguage, lastSubmittedFilename } = useCodeContext();
   const [showSource, setShowSource] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
+  const [showComplexityLegend, setShowComplexityLegend] = useState(false);
   const analysis = (location.state as { analysis?: AnalyzeResponse } | null)?.analysis;
   const staticAnalysis = analysis?.staticAnalysis;
   const ai = analysis?.aiRecommendation;
@@ -51,6 +52,62 @@ export const ResultsPage: React.FC = () => {
       </section>
       <section className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-6"><div className="flex items-center gap-2 mb-4"><Brain className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Local AI Optimization Review</h2></div>{ai?.available ? <><div className="flex items-center gap-2 mb-3"><Target className="w-4 h-4 text-emerald-600" /><span className="font-semibold text-zinc-900 dark:text-zinc-100">{ai.title}</span><span className="ml-auto text-[10px] uppercase font-semibold px-2 py-1 rounded bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800">{ai.confidence} confidence</span></div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.explanation}</p><div className="mt-4 rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Important condition</div><p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{ai.guard}</p></div><div className="mt-4 text-[11px] text-zinc-500">{ai.model} • {ai.trainingExamples} labeled training examples • feature-based classifier</div></> : <p className="text-sm text-zinc-500">Local optimization AI is unavailable for this request.</p>}</section>
     </div>
+
+    <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setShowComplexityLegend(!showComplexityLegend)}
+        aria-expanded={showComplexityLegend}
+        className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+      >
+        <span className="flex items-center gap-2 font-semibold text-zinc-900 dark:text-zinc-100"><Info className="w-4 h-4 text-emerald-600" />Big-O Complexity Reference</span>
+        <span className="flex items-center gap-2 text-xs text-zinc-500">{showComplexityLegend ? 'Hide reference' : 'Show reference'}{showComplexityLegend ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</span>
+      </button>
+      {showComplexityLegend && <div className="px-4 pb-4">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">A quick guide to how algorithm work typically grows as the input size increases. These are asymptotic growth classes; constants and lower-order terms are omitted.</p>
+        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <table className="w-full text-sm">
+            <thead className="bg-zinc-50 dark:bg-zinc-950 text-xs uppercase tracking-wide text-zinc-500"><tr><th className="px-3 py-2.5 text-left font-semibold">Complexity</th><th className="px-3 py-2.5 text-left font-semibold">Growth</th><th className="px-3 py-2.5 text-left font-semibold">Typical example / note</th></tr></thead>
+            <tbody>
+              {[
+                ['O(1)', 'Constant', 'Direct array access or a fixed number of operations.'],
+                ['O(log log n)', 'Iterated logarithmic', 'Very slowly growing bounds in specialized algorithms.'],
+                ['O(log n)', 'Logarithmic', 'Binary search on sorted data; repeatedly halving a search space.'],
+                ['O(√n)', 'Square-root', 'Trial division up to √n; some block-decomposition algorithms.'],
+                ['O(n)', 'Linear', 'One pass through an input array or list.'],
+                ['O(n log log n)', 'Near-linear', 'Sieve of Eratosthenes up to n, under the usual model.'],
+                ['O(n log n)', 'Linearithmic', 'Merge sort and heapsort; many efficient comparison-based sorts.'],
+                ['O(n log² n)', 'Linear times squared logarithm', 'Can appear in advanced divide-and-conquer algorithms.'],
+                ['O(n²)', 'Quadratic', 'All-pairs comparisons or two full nested traversals.'],
+                ['O(n² log n)', 'Quadratic-logarithmic', 'A quadratic amount of work with an extra logarithmic factor.'],
+                ['O(n³)', 'Cubic', 'Three nested linear loops; classical matrix multiplication.'],
+                ['O(nᵏ)', 'Polynomial', 'A fixed number k of nested input-sized loops; k is a constant.'],
+                ['O(2ⁿ)', 'Exponential', 'Enumerating all subsets; naive recursive Fibonacci has exponential time.'],
+                ['O(3ⁿ)', 'Exponential', 'Algorithms branching into roughly three recursive choices per level.'],
+                ['O(n!)', 'Factorial', 'Enumerating all permutations of n items.'],
+                ['O(nⁿ)', 'Super-exponential', 'Enumerating all length-n sequences where each position has n choices.'],
+                ['O(m + n)', 'Combined linear', 'Graph traversal or merging two inputs, with sizes m and n.'],
+                ['O(V + E)', 'Graph-linear', 'Breadth-first or depth-first search using adjacency lists; V vertices, E edges.'],
+              ].map(([complexity, growth, example], index) => <tr key={complexity} className={index % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50/70 dark:bg-zinc-950/50'}>
+                <td className="px-3 py-2.5 font-mono font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{complexity}</td>
+                <td className="px-3 py-2.5 text-zinc-700 dark:text-zinc-300 whitespace-nowrap">{growth}</td>
+                <td className="px-3 py-2.5 text-zinc-600 dark:text-zinc-400 min-w-56">{example}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 p-3">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Common space complexities</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400"><span className="font-mono">O(1)</span> constant auxiliary storage · <span className="font-mono">O(log n)</span> recursion stack in balanced divide-and-conquer · <span className="font-mono">O(n)</span> an extra array or hash table · <span className="font-mono">O(n²)</span> a matrix of input-sized dimensions.</p>
+          </div>
+          <div className="rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 p-3">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">How to read Big-O</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">Big-O describes an asymptotic upper bound, not an exact runtime. Actual complexity depends on the algorithm, input shape, data structures, and whether best-, average-, or worst-case behavior is being considered. Two nested loops do not automatically mean O(n²).</p>
+          </div>
+        </div>
+      </div>}
+    </section>
 
     <button onClick={() => setShowDetails(!showDetails)} className="self-start inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm">{showDetails ? 'Hide' : 'Show'} detailed findings{showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
     {showDetails && <div className="flex flex-col gap-6">
