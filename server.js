@@ -160,20 +160,29 @@ function analyzeStatically(code, language) {
 }
 
 function extractOptimizationFeatures(code, language, staticAnalysis) {
+  // These are source-pattern signals, not proof of runtime bottlenecks.
+  // Keep high-impact recommendation triggers conservative to reduce false positives.
   const normalized = code.toLowerCase();
-  const repeatedSearch = /\b(indexof|find|search|contains|includes|findindex|linear search)\b/.test(normalized)
-    || /for\s*\([^)]*\)[\s\S]{0,500}(?:==|===|equals\s*\()/.test(normalized);
-  const sorting = /\b(sort|sorted|arrays\.sort|std::sort)\s*\(/.test(normalized);
-  const binarySearch = /\b(binary.?search|lower_bound|upper_bound)\b/.test(normalized);
-  const repeatedComputation = /(?:Math\.|math\.|pow\s*\(|sqrt\s*\(|factorial|fibonacci)/.test(normalized)
-    && staticAnalysis.loopCount > 0;
-  const largeAllocation = staticAnalysis.metrics.collectionAllocations >= 2
-    || /\b(?:malloc|calloc|realloc|new\s+\w+\s*\[|new\s+ArrayList|new\s+HashMap)\b/.test(normalized);
-  const unnecessaryTraversal = staticAnalysis.loopCount >= 2
-    || /\.forEach\s*\(|\.map\s*\(|\.filter\s*\(/.test(normalized);
-  const spacePressure = largeAllocation || staticAnalysis.metrics.collectionAllocations >= 2 || staticAnalysis.metrics.recursiveFunctionCount > 0;
+  const hasCall = (names) => names.some((name) => new RegExp('(?:\\\\.|\\\\b)' + name + '\\\\s*\\\\(').test(normalized));
+  const repeatedSearch = hasCall(['indexof', 'contains', 'includes', 'findindex', 'binarysearch'])
+    || /\\.find\\s*\\(/.test(normalized)
+    || /\\b(?:std::find|find_if|lower_bound|upper_bound)\\s*\\(/.test(normalized);
+  const sorting = /\\b(?:sort|sorted|arrays\\.sort|std::sort)\\s*\\(/.test(normalized);
+  const binarySearch = /\\b(?:binarysearch|binary_search|lower_bound|upper_bound)\\s*\\(/.test(normalized);
+  const mathCalls = (normalized.match(/\\b(?:math\\.(?:pow|sqrt|sin|cos|log)|pow|sqrt|factorial|fibonacci)\\s*\\(/g) || []).length;
+  // Expensive-looking calls inside loops are only a weak signal; do not treat them as proof
+  // of loop-invariant repeated work without data-flow analysis.
+  const repeatedComputation = mathCalls >= 2 && staticAnalysis.loopCount > 0;
+  const allocationMatches = normalized.match(/\\b(?:malloc|calloc|realloc|new\\s+\\w+\\s*\\[|new\\s+(?:arraylist|hashmap|hashset|vector|linkedlist)|(?:list|dict|set)\\s*\\()/g) || [];
+  const allocationInsideLoop = /\\b(?:for|while)\\b[\\s\\S]{0,350}\\b(?:malloc|calloc|realloc|new\\s+\\w+\\s*\\[|new\\s+(?:arraylist|hashmap|hashset|vector|linkedlist))\\b/i.test(code);
+  const largeAllocation = allocationMatches.length >= 2 || allocationInsideLoop;
+  const traversalCalls = (normalized.match(/\\.(?:foreach|map|filter|reduce)\\s*\\(/g) || []).length;
+  // Sequential loops are not necessarily redundant; only surface traversal as a weak signal
+  // when multiple higher-level traversal calls are explicitly present.
+  const unnecessaryTraversal = traversalCalls >= 2;
+  const spacePressure = allocationMatches.length >= 2 || allocationInsideLoop;
   const branchDepth = Math.min(1, staticAnalysis.metrics.maxNestingDepth / 4);
-  const linearScan = staticAnalysis.loopCount > 0 || repeatedSearch;
+  const linearScan = repeatedSearch || /\\b(?:for|while)\\b/.test(normalized);
 
   return {
     nestedLoops: staticAnalysis.metrics.maxLoopNesting >= 2 ? Math.min(1, staticAnalysis.metrics.maxLoopNesting / 2) : 0,
@@ -182,7 +191,7 @@ function extractOptimizationFeatures(code, language, staticAnalysis) {
     binarySearch: binarySearch ? 1 : 0,
     recursion: staticAnalysis.metrics.recursiveFunctionCount > 0 ? 1 : 0,
     largeAllocation: largeAllocation ? 1 : 0,
-    repeatedComputation: repeatedComputation ? 1 : 0,
+    repeatedComputation: repeatedComputation ? 0.5 : 0,
     unnecessaryTraversal: unnecessaryTraversal ? 1 : 0,
     collectionUsage: Math.min(1, staticAnalysis.metrics.collectionAllocations / 2),
     spacePressure: spacePressure ? 1 : 0,
