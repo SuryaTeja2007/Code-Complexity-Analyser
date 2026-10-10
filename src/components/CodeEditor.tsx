@@ -78,7 +78,7 @@ function updateSyntaxMarkers(
     severity: MarkerSeverity.Error,
   })));
 }
-\n
+
 interface CodeEditorProps {
   code: string;
   language: SupportedLanguage;
@@ -102,11 +102,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const previousTabSizeRef = useRef(tabSize);
   const syntaxDiagnosticsRef = useRef<IDisposable | null>(null);
+  const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
   const langConfig = SUPPORTED_LANGUAGES[language];
   const monacoTheme = theme === 'dark' ? 'vs-dark' : 'light';
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     syntaxDiagnosticsRef.current?.dispose();
     syntaxDiagnosticsRef.current = editor.onDidChangeModelContent(() => {
       updateSyntaxMarkers(editor, monaco, language);
@@ -125,6 +127,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   useEffect(() => {
     const editor = editorRef.current;
     editor?.updateOptions({ fontSize, tabSize, insertSpaces: true });
+    if (editor && monacoRef.current) updateSyntaxMarkers(editor, monacoRef.current, language);
     if (editor && previousTabSizeRef.current !== tabSize) {
       void editor.getAction('editor.action.reindentlines')?.run();
     }
