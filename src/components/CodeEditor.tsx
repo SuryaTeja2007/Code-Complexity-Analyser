@@ -27,6 +27,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const { theme } = useTheme();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const previousTabSizeRef = useRef(tabSize);
   const langConfig = SUPPORTED_LANGUAGES[language];
   const monacoTheme = theme === 'dark' ? 'vs-dark' : 'light';
 
@@ -43,7 +44,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   };
 
   useEffect(() => {
-    editorRef.current?.updateOptions({ fontSize, tabSize, insertSpaces: true });
+    const editor = editorRef.current;
+    editor?.updateOptions({ fontSize, tabSize, insertSpaces: true });
+    if (editor && previousTabSizeRef.current !== tabSize) {
+      void editor.getAction('editor.action.reindentlines')?.run();
+    }
+    previousTabSizeRef.current = tabSize;
   }, [fontSize, tabSize]);
 
   return (
