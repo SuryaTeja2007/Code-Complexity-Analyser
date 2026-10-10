@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import Editor from '@monaco-editor/react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, Brain, AlertTriangle, Zap, Code2, Info, Target, ListChecks } from 'lucide-react';
 import { useCodeContext } from '../hooks/useCodeContext';
@@ -13,11 +14,19 @@ export const ResultsPage: React.FC = () => {
   const [showComplexityLegend, setShowComplexityLegend] = useState(false);
   const [showWhySuggestion, setShowWhySuggestion] = useState(false);
   const [showRecommendationDetails, setShowRecommendationDetails] = useState(false);
+  const [showComplexitySource, setShowComplexitySource] = useState(false);
   const analysis = (location.state as { analysis?: AnalyzeResponse } | null)?.analysis;
   const staticAnalysis = analysis?.staticAnalysis;
   const ai = analysis?.aiRecommendation;
   const detectedLanguage = analysis?.source?.language || lastSubmittedLanguage;
   const language = detectedLanguage ? SUPPORTED_LANGUAGES[detectedLanguage] : null;
+  const complexityLines = useMemo(() => {
+    const lines = (lastSubmittedCode || '').split(/\r?\n/);
+    const pattern = detectedLanguage === 'python' ? /^\s*(for|while)\b/ : /^\s*(for|while|do)\b/;
+    const loops = lines.map((line, index) => pattern.test(line) ? index + 1 : -1).filter(line => line > 0);
+    const value = (staticAnalysis?.timeComplexity || '').replace(/\s/g, '').toLowerCase();
+    return value.includes('n^2') || value.includes('n²') || value.includes('o(n2)') ? loops.slice(0, 2) : loops.slice(0, 1);
+  }, [lastSubmittedCode, detectedLanguage, staticAnalysis?.timeComplexity]);
 
   if (!analysis || !staticAnalysis) {
     return <div className="max-w-4xl w-full mx-auto px-4 py-12 text-center"><Info className="w-10 h-10 mx-auto mb-3 text-zinc-400" /><h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">No analysis result available</h1><p className="text-sm text-zinc-500 mt-2">Run an analysis from the Analyzer workspace first.</p><Link to="/analyzer" className="inline-flex mt-5 px-4 py-2 rounded-lg bg-zinc-900 dark:bg-emerald-600 text-white text-sm">Open Analyzer</Link></div>;
@@ -42,6 +51,13 @@ export const ResultsPage: React.FC = () => {
     </div>
 
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4"><div className="flex items-center gap-3"><Code2 className="w-5 h-5 text-emerald-600" /><div><div className="text-xs text-zinc-500">Source</div><div className="font-semibold text-zinc-900 dark:text-zinc-100">{lastSubmittedFilename || `Untitled ${language?.name || ''}`}</div></div><span className="ml-auto text-xs font-mono text-zinc-500">{analysis.source?.lines} lines • {analysis.source?.characters} chars</span></div><button onClick={() => setShowSource(!showSource)} className="mt-3 inline-flex items-center gap-1 text-xs text-emerald-600">{showSource ? 'Hide Source' : 'View Source'}{showSource ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>{showSource && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-100"><code>{lastSubmittedCode}</code></pre>}</div>
+
+    <section className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Why {staticAnalysis.timeComplexity || 'this complexity'}?</h2><p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Highlighted loop lines show the structural evidence behind this estimate. This is a static estimate, not a runtime measurement.</p></div><button type="button" onClick={() => setShowComplexitySource(value => !value)} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700">{showComplexitySource ? 'Hide highlighted source' : 'Highlight complexity lines'}</button></div>
+      {showComplexitySource && <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"><Editor height="300px" language={language?.monacoLanguage || 'plaintext'} value={lastSubmittedCode || ''} theme="vs-dark" onMount={(editor) => { if (complexityLines.length) { editor.deltaDecorations([], complexityLines.map(line => ({ range: { startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: 1 }, options: { isWholeLine: true, className: 'complexity-source-highlight', glyphMarginClassName: 'complexity-source-glyph' } }))); editor.revealLineInCenter(complexityLines[0]); } }} options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12, lineNumbers: 'on', scrollBeyondLastLine: false, automaticLayout: true, renderLineHighlight: 'none' }} /></div>}
+      {complexityLines.length === 0 && <p className="mt-2 text-xs text-zinc-500">No loop lines were detected by the current lightweight highlighter.</p>}
+      <style>{'.complexity-source-highlight { background: rgba(245, 158, 11, 0.22); border-left: 3px solid #f59e0b; } .complexity-source-glyph { background: #f59e0b; width: 4px !important; margin-left: 3px; }'}</style>
+    </section>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
       <section className="min-w-0 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
