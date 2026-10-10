@@ -51,7 +51,12 @@ export function findSyntaxIssues(code: string, language: SupportedLanguage): Syn
     }
 
     if (language === 'python') {
-      if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\b/.test(trimmed) && !trimmed.endsWith(':') && !trimmed.endsWith(String.fromCharCode(92))) {
+      // Accept a colon followed by an inline comment, and ignore one-line suites
+      // that use a backslash continuation. This remains a lightweight heuristic.
+      const isPythonHeader = /^(if|elif|else|for|while|def|class|try|except|finally|with)\b/.test(trimmed);
+      const hasHeaderColon = /:\s*(#.*)?$/.test(trimmed);
+      const isContinuedLine = trimmed.endsWith(String.fromCharCode(92));
+      if (isPythonHeader && !hasHeaderColon && !isContinuedLine) {
         issues.push({ line: lineIndex + 1, column: Math.max(1, rawLine.length), message: 'Expected a colon (:) at the end of this statement.' });
       }
     }
