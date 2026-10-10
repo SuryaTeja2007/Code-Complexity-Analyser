@@ -12,6 +12,7 @@ export const ResultsPage: React.FC = () => {
   const [showDetails, setShowDetails] = useState(true);
   const [showComplexityLegend, setShowComplexityLegend] = useState(false);
   const [showWhySuggestion, setShowWhySuggestion] = useState(false);
+  const [showRecommendationDetails, setShowRecommendationDetails] = useState(false);
   const analysis = (location.state as { analysis?: AnalyzeResponse } | null)?.analysis;
   const staticAnalysis = analysis?.staticAnalysis;
   const ai = analysis?.aiRecommendation;
@@ -58,9 +59,16 @@ export const ResultsPage: React.FC = () => {
           <div className="grid grid-cols-1 gap-3">
             <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Issue detected</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.issue || ai.explanation}</p></div>
             <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Suggested approach</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.approach || ai.explanation}</p></div>
+          </div>
+          <button type="button" onClick={() => setShowRecommendationDetails(!showRecommendationDetails)} aria-expanded={showRecommendationDetails} className="mt-3 w-full flex items-center justify-between gap-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-white/70 dark:bg-zinc-900/70 px-3 py-2.5 text-left text-sm font-medium text-emerald-800 dark:text-emerald-300 hover:bg-white dark:hover:bg-zinc-900">
+            <span>{showRecommendationDetails ? 'Hide recommendation details' : 'More recommendation details'}</span>
+            {showRecommendationDetails ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+          </button>
+          {showRecommendationDetails && <div className="mt-3 grid grid-cols-1 gap-3">
             <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Potential benefit</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.expectedBenefit || 'Any performance benefit depends on the actual algorithm and workload; no improvement is guaranteed.'}</p></div>
             <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Conditions for use</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.guard}</p></div>
             <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Trade-offs</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.tradeoffs || 'Evaluate memory use, setup cost, maintainability, and behavior before applying this suggestion.'}</p></div>
+          </div>}
           </div>
           <button type="button" onClick={() => setShowWhySuggestion(!showWhySuggestion)} aria-expanded={showWhySuggestion} className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:underline">{showWhySuggestion ? 'Hide why this suggestion?' : 'Why this suggestion?'}{showWhySuggestion ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
           {showWhySuggestion && <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-white/80 dark:bg-zinc-900/80 p-4">
