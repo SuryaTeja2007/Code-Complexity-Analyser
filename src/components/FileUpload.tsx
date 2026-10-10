@@ -13,6 +13,24 @@ interface FileUploadProps {
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
+// Content-based fallback for .txt and text-based PDFs, where the filename has no language.
+const detectLanguageFromContent = (source: string): SupportedLanguage | null => {
+  const code = source.trim();
+  if (!code) return null;
+
+  const patterns: Record<SupportedLanguage, RegExp[]> = {
+    python: [/^\s*(?:from\s+\w+\s+import|import\s+\w+)/m, /^\s*def\s+\w+\s*\(/m, /^\s*(?:if|elif|for|while|class|try|except)\b.*:\s*$/m, /\bprint\s*\(/],
+    java: [/\bpublic\s+(?:static\s+)?(?:class|interface|enum)\b/, /\bSystem\.out\.(?:print|println|printf)\s*\(/, /\bpublic\s+static\s+void\s+main\s*\(/, /\b(?:String|boolean|byte|short|int|long|float|double)\s+\w+\s*[=;,(]/],
+    cpp: [/#include\s*<\s*(?:iostream|string|vector|bits\/stdc\+\+\.h)\s*>/, /\bstd::\w+/, /\bcout\s*<</, /\b(?:class|namespace)\s+\w+/],
+    c: [/#include\s*[<"](?:stdio|stdlib|string|math|stdbool)\.h[>"]/, /\bprintf\s*\(/, /\bscanf\s*\(/, /\bint\s+main\s*\(\s*(?:void)?\s*\)/],
+  };
+  const scores = (Object.entries(patterns) as Array<[SupportedLanguage, RegExp[]]>)
+    .map(([language, regexes]) => ({ language, score: regexes.reduce((total, regex) => total + (regex.test(code) ? 1 : 0), 0) }))
+    .sort((a, b) => b.score - a.score);
+  if (scores[0].score === 0 || scores[0].score === scores[1].score) return null;
+  return scores[0].language;
+};
+
 export const FileUpload: React.FC<FileUploadProps> = ({
   onFileLoaded,
   onError,
@@ -63,7 +81,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
     setIsProcessing(true);
     try {
-      const detected = detectLanguageFromFilename(file.name) || currentLanguage;
       let text: string;
 
       if (lowerName.endsWith('.pdf')) {
@@ -75,6 +92,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         text = await file.text();
       }
 
+      const detected = detectLanguageFromFilename(file.name)
+        || (isGeneric ? detectLanguageFromContent(text) : null)
+        || currentLanguage;
       onFileLoaded(text, detected, file.name);
       onError('');
     } catch (error) {
@@ -162,7 +182,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                 <span>.txt, .pdf</span>
               </div>
               <div className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                For .txt/.pdf, the selected language ({SUPPORTED_LANGUAGES[currentLanguage].name}) is used for analysis.
+                For .txt/.pdf, language is detected from the extracted code when possible; otherwise the selected language ({SUPPORTED_LANGUAGES[currentLanguage].name}) is used.
               </div>
             </>
           )}
