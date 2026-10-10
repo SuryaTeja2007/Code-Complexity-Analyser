@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, Brain, Clock, HardDrive, AlertTriangle, Zap, CheckSquare, Code2, Info, Target } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Brain, Clock, HardDrive, AlertTriangle, Zap, CheckSquare, Code2, Info, Target, ListChecks } from 'lucide-react';
 import { useCodeContext } from '../hooks/useCodeContext';
 import { SUPPORTED_LANGUAGES } from '../utils/languages';
 import { AnalyzeResponse } from '../types';
@@ -13,11 +13,23 @@ export const ResultsPage: React.FC = () => {
   const analysis = (location.state as { analysis?: AnalyzeResponse } | null)?.analysis;
   const staticAnalysis = analysis?.staticAnalysis;
   const ai = analysis?.aiRecommendation;
-  const language = lastSubmittedLanguage ? SUPPORTED_LANGUAGES[lastSubmittedLanguage] : null;
+  const detectedLanguage = analysis?.source?.language || lastSubmittedLanguage;
+  const language = detectedLanguage ? SUPPORTED_LANGUAGES[detectedLanguage] : null;
 
   if (!analysis || !staticAnalysis) {
     return <div className="max-w-4xl w-full mx-auto px-4 py-12 text-center"><Info className="w-10 h-10 mx-auto mb-3 text-zinc-400" /><h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">No analysis result available</h1><p className="text-sm text-zinc-500 mt-2">Run an analysis from the Analyzer workspace first.</p><Link to="/analyzer" className="inline-flex mt-5 px-4 py-2 rounded-lg bg-zinc-900 dark:bg-emerald-600 text-white text-sm">Open Analyzer</Link></div>;
   }
+
+  const recommendationCount = staticAnalysis.suggestions.length + (ai?.available ? 1 : 0);
+  const summaryRows: Array<{ label: string; value: string | number }> = [
+    { label: 'Language', value: language?.name || 'Unknown' },
+    { label: 'Estimated time complexity', value: staticAnalysis.timeComplexity || 'Not available' },
+    { label: 'Estimated auxiliary space', value: staticAnalysis.spaceComplexity || 'Not available' },
+    { label: 'Maximum loop nesting', value: staticAnalysis.metrics.maxLoopNesting ?? 'Not measured' },
+    { label: 'Functions detected', value: staticAnalysis.metrics.functionCount },
+    { label: 'Code-quality issues', value: staticAnalysis.codeSmells.length },
+    { label: 'Optimization recommendations', value: recommendationCount },
+  ];
 
   const cards = [
     { title: 'Time Complexity', value: staticAnalysis.timeComplexity, icon: Clock },
@@ -34,8 +46,16 @@ export const ResultsPage: React.FC = () => {
 
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{cards.map(({ title, value, icon: Icon }) => <div key={title} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"><Icon className="w-5 h-5 text-emerald-600 mb-4" /><div className="text-xs text-zinc-500">{title}</div><div className="mt-1 text-lg font-bold text-zinc-900 dark:text-zinc-100 break-words">{value}</div></div>)}</div>
 
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6">
+      <div className="flex items-center gap-2 mb-4"><ListChecks className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Analysis Summary</h2></div>
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div className="grid grid-cols-2 bg-zinc-50 dark:bg-zinc-950 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500"><span>Metric</span><span>Result</span></div>
+        {summaryRows.map((row, index) => <div key={row.label} className={`grid grid-cols-2 gap-3 px-4 py-3 text-sm ${index % 2 === 0 ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50/70 dark:bg-zinc-950/50'} border-t border-zinc-100 dark:border-zinc-800`}><span className="text-zinc-600 dark:text-zinc-400">{row.label}</span><span className="font-medium text-zinc-900 dark:text-zinc-100 break-words">{row.value}</span></div>)}
+      </div>
+      <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Complexity values are static estimates. Loop nesting is reported from the analyzer's loop-nesting metric; unavailable metrics are not inferred.</p>
+    </div>
+
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6"><h2 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Static Analysis</h2><p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{staticAnalysis.explanation}</p><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">{Object.entries(staticAnalysis.metrics).map(([key, value]) => <div key={key} className="rounded-lg bg-zinc-50 dark:bg-zinc-950 p-3"><div className="text-[10px] uppercase text-zinc-400">{key.replace(/([A-Z])/g, ' $1')}</div><div className="font-semibold text-zinc-900 dark:text-zinc-100 mt-1">{value}</div></div>)}</div></section>
       <section className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-6"><div className="flex items-center gap-2 mb-4"><Brain className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Local AI Optimization Review</h2></div>{ai?.available ? <><div className="flex items-center gap-2 mb-3"><Target className="w-4 h-4 text-emerald-600" /><span className="font-semibold text-zinc-900 dark:text-zinc-100">{ai.title}</span><span className="ml-auto text-[10px] uppercase font-semibold px-2 py-1 rounded bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800">{ai.confidence} confidence</span></div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.explanation}</p><div className="mt-4 rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Important condition</div><p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{ai.guard}</p></div><div className="mt-4 text-[11px] text-zinc-500">{ai.model} • {ai.trainingExamples} labeled training examples • feature-based classifier</div></> : <p className="text-sm text-zinc-500">Local optimization AI is unavailable for this request.</p>}</section>
     </div>
 
