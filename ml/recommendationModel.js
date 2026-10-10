@@ -250,7 +250,7 @@ export function recommendOptimizations(features) {
     .map((item) => ({ label: item.label, title: RECOMMENDATIONS[item.label].title, score: Number(item.score.toFixed(3)) }));
   return {
     available: true,
-    model: 'Local Optimization Recommender v0.2',
+    model: 'Local Optimization Recommender v0.3',
     modelType: 'centroid-similarity-classifier-with-signal-gating',
     trainingExamples: MODEL.trainingExamples,
     recommendation: selectedLabel,
