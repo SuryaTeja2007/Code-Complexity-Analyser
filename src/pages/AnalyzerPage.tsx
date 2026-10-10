@@ -13,7 +13,7 @@ export const AnalyzerPage: React.FC = () => {
   const navigate = useNavigate();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { language, code, activeFilename, setLanguage, setCode, setActiveFilename, setValidationError, setInfoNotification, loadSampleCode, clearCode, recordSubmission } = useCodeContext();
-  const lineCount = useMemo(() => (code ? code.split('\\n').length : 0), [code]);
+  const lineCount = useMemo(() => (code ? code.split('\n').length : 0), [code]);
   const charCount = useMemo(() => code.length, [code]);
 
   const handleLanguageChange = (newLang: SupportedLanguage) => {
@@ -26,18 +26,15 @@ export const AnalyzerPage: React.FC = () => {
       setValidationError('Enter or paste some code before detecting its language.');
       return;
     }
-
     const detectedLanguage = detectLanguageFromCode(code);
     if (!detectedLanguage) {
       setInfoNotification('Could not confidently identify this snippet. Select the language manually or include more code.');
       return;
     }
-
     if (detectedLanguage === language) {
       setInfoNotification(`Detected ${SUPPORTED_LANGUAGES[detectedLanguage].name}. The selected language already matches.`);
       return;
     }
-
     // setLanguage resets the editor to a sample, so restore the user's source afterwards.
     setLanguage(detectedLanguage);
     setCode(code);
@@ -51,7 +48,7 @@ export const AnalyzerPage: React.FC = () => {
     setCode(content);
     setActiveFilename(filename);
     setValidationError(null);
-    const isGenericFile = /\\.(txt|pdf)$/i.test(filename);
+    const isGenericFile = /\.(txt|pdf)$/i.test(filename);
     setInfoNotification(isGenericFile ? `Successfully loaded "${filename}" using ${SUPPORTED_LANGUAGES[fileLanguage].name} for analysis.` : `Successfully loaded "${filename}" (${SUPPORTED_LANGUAGES[fileLanguage].name}).`);
   };
 
