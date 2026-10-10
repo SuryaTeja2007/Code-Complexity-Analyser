@@ -233,24 +233,30 @@ export function recommendOptimizations(features) {
   const vector = toVector(features);
   const classified = classify(vector);
   const gatedLabel = dominantLabel(features);
-  const selectedLabel = gatedLabel || classified.best.label;
+  // Do not force a specific optimization merely because one centroid ranks first.
+  // A specific recommendation requires a strong, interpretable structural trigger.
+  const hasActionableSignal = Boolean(gatedLabel);
+  const selectedLabel = gatedLabel || 'NO_MAJOR_OPTIMIZATION';
   const recommendation = RECOMMENDATIONS[selectedLabel];
   const selectedScore = classified.ranked.find((item) => item.label === selectedLabel)?.score || 0;
-  const secondBestScore = classified.ranked.find((item) => item.label !== selectedLabel)?.score || 0;
+  const competingScores = classified.ranked.filter((item) => item.label !== selectedLabel).map((item) => item.score);
+  const secondBestScore = competingScores.length ? Math.max(...competingScores) : 0;
   const margin = selectedScore - secondBestScore;
-  // This is a conservative heuristic category, not a calibrated probability.
-  const confidence = selectedScore >= 0.8 && margin >= 0.12
-    ? 'high'
-    : selectedScore >= 0.55 && margin >= 0.04
-      ? 'medium'
-      : 'low';
+  // Confidence is a conservative heuristic, not a calibrated probability.
+  const confidence = !hasActionableSignal
+    ? 'low'
+    : selectedScore >= 0.8 && margin >= 0.12
+      ? 'high'
+      : selectedScore >= 0.55 && margin >= 0.04
+        ? 'medium'
+        : 'low';
   const alternatives = classified.ranked
     .filter((item) => item.label !== selectedLabel)
     .slice(0, 3)
     .map((item) => ({ label: item.label, title: RECOMMENDATIONS[item.label].title, score: Number(item.score.toFixed(3)) }));
   return {
     available: true,
-    model: 'Local Optimization Recommender v0.3',
+    model: 'Local Optimization Recommender v0.4',
     modelType: 'centroid-similarity-classifier-with-signal-gating',
     trainingExamples: MODEL.trainingExamples,
     recommendation: selectedLabel,
@@ -272,7 +278,7 @@ export function recommendOptimizations(features) {
 
 export const recommendationModelInfo = {
   name: 'Local Optimization Recommender',
-  version: '0.3',
+  version: '0.4',
   type: 'centroid-similarity-classifier-with-signal-gating',
   featureCount: FEATURES.length,
   trainingExamples: MODEL.trainingExamples,
