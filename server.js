@@ -163,10 +163,11 @@ function extractOptimizationFeatures(code, language, staticAnalysis) {
   // These are source-pattern signals, not proof of runtime bottlenecks.
   // Keep high-impact recommendation triggers conservative to reduce false positives.
   const normalized = code.toLowerCase();
-  const hasCall = (names) => names.some((name) => new RegExp('(?:\\.|\\b)' + name + '\\s*\\(').test(normalized));
-  const repeatedSearch = hasCall(['indexof', 'contains', 'includes', 'findindex', 'binarysearch'])
-    || /\.find\s*\(/.test(normalized)
-    || /\b(?:std::find|find_if|lower_bound|upper_bound)\s*\(/.test(normalized);
+  const searchCallPattern = /(?:\.|\b)(?:indexof|contains|includes|findindex|find|binarysearch|binary_search|lower_bound|upper_bound|std::find|find_if)\s*\(/g;
+  const searchCalls = normalized.match(searchCallPattern) || [];
+  const searchInsideLoop = /\b(?:for|while)\b[\s\S]{0,500}(?:\.|\b)(?:indexof|contains|includes|findindex|find|binarysearch|binary_search|lower_bound|upper_bound|std::find|find_if)\s*\(/.test(normalized);
+  // A single lookup is not evidence of repeated lookup; require repeated calls or a loop/search combination.
+  const repeatedSearch = searchCalls.length >= 2 || (searchCalls.length >= 1 && searchInsideLoop);
   const sorting = /\b(?:sort|sorted|arrays\.sort|std::sort)\s*\(/.test(normalized);
   const binarySearch = /\b(?:binarysearch|binary_search|lower_bound|upper_bound)\s*\(/.test(normalized);
   const mathCalls = (normalized.match(/\b(?:math\.(?:pow|sqrt|sin|cos|log)|pow|sqrt|factorial|fibonacci)\s*\(/g) || []).length;
