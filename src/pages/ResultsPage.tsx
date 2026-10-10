@@ -11,6 +11,7 @@ export const ResultsPage: React.FC = () => {
   const [showSource, setShowSource] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [showComplexityLegend, setShowComplexityLegend] = useState(false);
+  const [showWhySuggestion, setShowWhySuggestion] = useState(false);
   const analysis = (location.state as { analysis?: AnalyzeResponse } | null)?.analysis;
   const staticAnalysis = analysis?.staticAnalysis;
   const ai = analysis?.aiRecommendation;
@@ -50,7 +51,27 @@ export const ResultsPage: React.FC = () => {
       </div>
       <p className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">Complexity values are static estimates. Loop nesting is reported from the analyzer's loop-nesting metric; unavailable metrics are not inferred.</p>
       </section>
-      <section className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-6"><div className="flex items-center gap-2 mb-4"><Brain className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Local AI Optimization Review</h2></div>{ai?.available ? <><div className="flex items-center gap-2 mb-3"><Target className="w-4 h-4 text-emerald-600" /><span className="font-semibold text-zinc-900 dark:text-zinc-100">{ai.title}</span><span className="ml-auto text-[10px] uppercase font-semibold px-2 py-1 rounded bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800">{ai.confidence} confidence</span></div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.explanation}</p><div className="mt-4 rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Important condition</div><p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{ai.guard}</p></div><div className="mt-4 text-[11px] text-zinc-500">{ai.model} • {ai.trainingExamples} labeled training examples • feature-based classifier</div></> : <p className="text-sm text-zinc-500">Local optimization AI is unavailable for this request.</p>}</section>
+      <section className="min-w-0 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-5 sm:p-6">
+        <div className="flex items-center gap-2 mb-4"><Brain className="w-5 h-5 text-emerald-600" /><h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Local AI Optimization Review</h2></div>
+        {ai?.available ? <>
+          <div className="flex flex-wrap items-center gap-2 mb-4"><Target className="w-4 h-4 text-emerald-600 shrink-0" /><span className="font-semibold text-zinc-900 dark:text-zinc-100">{ai.title}</span><span className="sm:ml-auto text-[10px] uppercase font-semibold px-2 py-1 rounded bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800">{ai.confidence} model confidence</span></div>
+          <div className="grid grid-cols-1 gap-3">
+            <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Issue detected</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.issue || ai.explanation}</p></div>
+            <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Suggested approach</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.approach || ai.explanation}</p></div>
+            <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Potential benefit</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.expectedBenefit || 'Any performance benefit depends on the actual algorithm and workload; no improvement is guaranteed.'}</p></div>
+            <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Conditions for use</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.guard}</p></div>
+            <div className="rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-emerald-100 dark:border-emerald-900 p-3"><div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Trade-offs</div><p className="text-sm text-zinc-700 dark:text-zinc-300">{ai.tradeoffs || 'Evaluate memory use, setup cost, maintainability, and behavior before applying this suggestion.'}</p></div>
+          </div>
+          <button type="button" onClick={() => setShowWhySuggestion(!showWhySuggestion)} aria-expanded={showWhySuggestion} className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:underline">{showWhySuggestion ? 'Hide why this suggestion?' : 'Why this suggestion?'}{showWhySuggestion ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
+          {showWhySuggestion && <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-white/80 dark:bg-zinc-900/80 p-4">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">These are structural signals from heuristic source inspection. They explain the model's recommendation, but do not prove the code is inefficient or that a change is safe.</p>
+            {ai.triggeredFeatures?.length ? <ul className="space-y-3">{ai.triggeredFeatures.map((feature) => <li key={feature.feature} className="text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-zinc-800 dark:text-zinc-200">{feature.label}</span><span className="font-mono text-xs text-zinc-500">signal {feature.value.toFixed(2)} / 1</span></div><p className="mt-1 text-zinc-600 dark:text-zinc-400">{feature.explanation}</p></li>)}</ul> : <p className="text-sm text-zinc-600 dark:text-zinc-400">No individual structural feature crossed the display threshold. The model selected this category from its overall feature-vector similarity.</p>}
+            <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Confidence is a coarse classifier-confidence heuristic, not a calibrated probability. Similarity score: {typeof ai.score === 'number' ? ai.score.toFixed(3) : 'not available'}. {ai.scoreMeaning || 'The score is not a probability that the recommendation is correct.'}</p>
+          </div>}
+          <div className="mt-4 text-[11px] text-zinc-500">{ai.model} • {ai.trainingExamples} labeled training examples • feature-based classifier</div>
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Treat this as a hypothesis to review, not an automatic fix. Verify correctness and benchmark representative inputs before changing production code.</p>
+        </> : <p className="text-sm text-zinc-500">Local optimization AI is unavailable for this request.</p>}
+      </section>
     </div>
 
     <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
