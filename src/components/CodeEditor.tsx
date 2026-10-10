@@ -11,7 +11,7 @@ type SyntaxIssue = { line: number; column: number; message: string };
 
 function findSyntaxIssues(code: string, language: SupportedLanguage): SyntaxIssue[] {
   const issues: SyntaxIssue[] = [];
-  const lines = code.split(/\\r?\\n/);
+  const lines = code.split(/\r?\n/);
   const stack: Array<{ char: string; line: number; column: number }> = [];
   const pairs: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
   let inBlockComment = false;
@@ -28,7 +28,7 @@ function findSyntaxIssues(code: string, language: SupportedLanguage): SyntaxIssu
       }
       if (quote) {
         if (escaped) escaped = false;
-        else if (ch === '\\\\') escaped = true;
+        else if (ch === '\\') escaped = true;
         else if (ch === quote) quote = null;
         continue;
       }
@@ -47,7 +47,7 @@ function findSyntaxIssues(code: string, language: SupportedLanguage): SyntaxIssu
 
     if (language === 'python') {
       const trimmed = rawLine.trim();
-      if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\\b/.test(trimmed) && !trimmed.endsWith(':') && !trimmed.endsWith('\\')) {
+      if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\b/.test(trimmed) && !trimmed.endsWith(':') && !trimmed.endsWith('\')) {
         issues.push({ line: lineIndex + 1, column: Math.max(1, rawLine.length), message: 'Expected a colon (:) at the end of this statement.' });
       }
     }
@@ -78,7 +78,8 @@ function updateSyntaxMarkers(
     severity: MarkerSeverity.Error,
   })));
 }
-\ninterface CodeEditorProps {
+\n
+interface CodeEditorProps {
   code: string;
   language: SupportedLanguage;
   onChange: (value: string | undefined) => void;
