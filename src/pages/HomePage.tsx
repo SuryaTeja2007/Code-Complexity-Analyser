@@ -28,5 +28,43 @@ export const HomePage: React.FC = () => {
     </div></section>
     <section className="py-16 bg-zinc-50 dark:bg-zinc-950"><div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div className="text-center max-w-2xl mx-auto mb-12"><h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Comprehensive Code Intelligence</h2><p className="mt-3 text-sm sm:text-base text-zinc-600 dark:text-zinc-400">Deterministic source inspection provides measurable structure; the local ML model adds learned optimization recommendations.</p></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{features.map((feature, idx) => { const Icon = feature.icon; return <div key={idx} id={`feature-card-${idx}`} className="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col"><div className="flex items-center justify-between mb-4"><div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center"><Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div><span className="text-[11px] font-mono uppercase bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{feature.badge}</span></div><h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-2">{feature.title}</h3><p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{feature.description}</p></div>; })}</div></div></section>
     <section className="py-16 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40"><div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8"><h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Supported Languages</h2><p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Java, C, C++, and Python are currently supported.</p><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">{languagesList.map((lang) => <div key={lang.id} className="p-5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900"><div className="flex items-center justify-between mb-3"><span className="font-semibold text-base text-zinc-900 dark:text-zinc-100">{lang.name}</span><span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800">{lang.extensions.join(', ')}</span></div><p className="text-xs text-zinc-500 dark:text-zinc-400">{lang.description}</p></div>)}</div><div className="mt-12 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex flex-col sm:flex-row items-center justify-between gap-4"><div><h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Ready to inspect source code?</h3><p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-0.5">Open the Monaco workspace and analyze a snippet, method, or source file.</p></div><Link to="/analyzer" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 dark:bg-emerald-600 text-white text-xs sm:text-sm font-medium"><Code2 className="w-4 h-4" />Open Analyzer</Link></div></div></section>
+    <section className="py-16 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">How Complexity Is Estimated</h2>
+          <p className="mt-3 text-sm sm:text-base leading-relaxed text-zinc-600 dark:text-zinc-400">The analyzer uses rule-based static heuristics to inspect source patterns without executing the program. These rules provide an approximate estimate, not a formal proof of a program's complexity.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+          <article className="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center"><Clock className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Time Complexity</h3>
+            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">The analyzer applies the following ordered rules:</p>
+            <ol className="mt-4 space-y-3 text-sm text-zinc-700 dark:text-zinc-300 list-decimal list-inside">
+              <li><span className="font-medium">Recursion detection:</span> recursive functions are reported as an approximate range from O(n) to O(2ⁿ), depending on branching; multiple detected recursive functions trigger an O(2ⁿ) approximation.</li>
+              <li><span className="font-medium">Nested loops:</span> two detected loop levels suggest O(n²); three or more are capped at an approximate O(n³).</li>
+              <li><span className="font-medium">Single-level loops:</span> detected loops without deeper nesting suggest O(n).</li>
+              <li><span className="font-medium">Sorting pattern:</span> if no earlier rule matches, recognized sorting calls suggest O(n log n).</li>
+              <li><span className="font-medium">No recognized pattern:</span> defaults to O(1).</li>
+            </ol>
+            <p className="mt-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Rule order matters: recursion and loop checks take precedence over sorting detection.</p>
+          </article>
+          <article className="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center"><HardDrive className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Space Complexity</h3>
+            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">A simple allocation-and-recursion heuristic is used:</p>
+            <ul className="mt-4 space-y-3 text-sm text-zinc-700 dark:text-zinc-300 list-disc list-inside">
+              <li><span className="font-medium">O(n) (approximate):</span> recursion is detected or a recognized collection allocation pattern is found.</li>
+              <li><span className="font-medium">O(1):</span> neither recursion nor a recognized collection allocation pattern is detected.</li>
+            </ul>
+            <p className="mt-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">This simplified rule does not calculate actual allocation sizes or distinguish all recursion-stack and data-structure costs.</p>
+          </article>
+        </div>
+        <p className="mt-6 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Limitations: the current implementation relies on regular expressions and indentation/brace-based nesting estimates, rather than a full language parser. It may miss input-dependent loop bounds, logarithmic loops, recursion branching, and library-operation costs. Treat the results as guidance for review, not guaranteed complexity bounds.</p>
+      </div>
+    </section>
   </div>;
 };
